@@ -1125,6 +1125,32 @@
     #quickStart .qsSign b, .gameSign b { color: #d6ff60; font-weight: 700 }
     #menu .gameSign { grid-column: 1 / -1; padding: 12px 0 4px; opacity: .9 }
     @media (max-height: 540px) and (orientation: landscape) { #quickStart .qsSign { grid-column: 1 / -1; margin-top: 4px } }
+    #xBar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 4px }
+    #xBar button { padding: 7px 12px; border-radius: 999px; border: 1px solid #ffffff33; background: #ffffff10; color: #e9eedf; font: 700 .82rem system-ui, sans-serif; cursor: pointer }
+    #xBar button:hover { border-color: #d6ff60; color: #d6ff60 }
+    #quickStart .qsLinks { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap }
+    #quickStart .qsLinks .qsHelp { width: auto }
+    .xModal { position: fixed; inset: 0; z-index: 140; display: flex; align-items: center; justify-content: center; padding: 14px; background: #000b; color: #e9eedf; font-family: system-ui, -apple-system, sans-serif; overflow-y: auto }
+    .xCard { position: relative; width: min(480px, 100%); margin: auto 0; background: radial-gradient(ellipse at 50% 0%, #24442f, #0e1612 70%); border: 1px solid #d6ff6066; border-radius: 20px; padding: 20px }
+    .xCard h2 { margin: 10px 0 12px; font-size: 1.35rem }
+    .xTag { display: inline-block; background: #d6ff60; color: #10180f; font-weight: 900; letter-spacing: .1em; font-size: .72rem; padding: 4px 10px; border-radius: 999px }
+    .xClose { position: absolute; right: 12px; top: 12px; width: 36px; height: 36px; border-radius: 10px; border: 0; background: #ffffff14; color: #fff; font-size: 1rem; cursor: pointer }
+    .xSmall { color: #a9b7a2; font-size: .8rem; margin: 10px 0 0 }
+    .msRow { padding: 10px 12px; margin: 8px 0; border-radius: 12px; background: #ffffff0b; border: 1px solid #ffffff1a }
+    .msRow.ok { border-color: #8fe36a88; background: #8fe36a14 }
+    .msRow b { display: block; font-size: .95rem }
+    .msRow small { display: block; color: #a9b7a2; font-size: .78rem; margin: 3px 0 6px }
+    .msBar { display: block; height: 6px; border-radius: 99px; background: #ffffff14; overflow: hidden }
+    .msBar i { display: block; height: 100%; background: #d6ff60 }
+    .fbKinds { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px }
+    .fbKinds button { flex: 1; min-width: 110px; padding: 9px; border-radius: 10px; border: 1px solid #ffffff33; background: #ffffff10; color: #e9eedf; font-weight: 700; cursor: pointer }
+    .fbKinds button.on { border-color: #d6ff60; color: #d6ff60; background: #d6ff6018 }
+    #fbText { width: 100%; min-height: 110px; box-sizing: border-box; padding: 10px; border-radius: 12px; border: 1px solid #ffffff33; background: #0b120f; color: #e9eedf; font: inherit; resize: vertical }
+    #fbName { width: 100%; box-sizing: border-box; margin-top: 8px; padding: 10px; border-radius: 10px; border: 1px solid #ffffff33; background: #0b120f; color: #e9eedf; font: inherit }
+    .fbBtns { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-top: 12px }
+    .fbBtns button { padding: 12px; border-radius: 12px; font-weight: 800; cursor: pointer; border: 1px solid #ffffff33; background: #ffffff12; color: #e9eedf }
+    .fbBtns .fbSend { background: linear-gradient(90deg, #d6ff60, #9be36a); color: #10180f; border: 0 }
+    .fbMsg { margin: 10px 0 0; color: #c9d2bd; font-size: .85rem }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -5299,6 +5325,7 @@
       for (const c of checks) if (c.kind === 'toll' && c.s - 130 > origin + 2 && c.s - 130 < origin + 300) props.push({ s: c.s - 130, prop: 'tollSign', c });
       try { for (const spot of overpassSpots()) props.push({ s: spot.s - 6, half: 16, prop: 'belemOverpass', spot }, { s: spot.s - 15, prop: 'yLamp', spot }, { s: spot.s - 250, prop: 'viaductSign', dist: 250 }) } catch (e) { }
       if (cop && !cop.over && cop.s >= z - (camMode < 2 ? 3.6 : 0)) props.push(cop);
+      try { const gp = ghostProp(); if (gp) props.push(gp) } catch (e) { }
       const objects = [...checks, ...traffic, ...rivals, ...props].filter(item => item.s + (item.type?.half ?? item.half ?? 0) - origin > 2.4 && item.s - origin < 420).sort((a, b) => b.s - a.s);
       for (const item of objects) {
         if (item.prop === 'belemOverpass') { try { drawBelemOverpass(project, strip, origin, item.spot) } catch (e) { } continue }
@@ -5323,6 +5350,7 @@
           }
           continue;
         }
+        if (item.ghost) { ctx.save(); ctx.globalAlpha = .42; try { drawTrafficVehicle(item, project, origin) } catch (e) { } ctx.restore(); continue }
         drawTrafficVehicle(item, project, origin);
         drawTrafficIndicator(item,project,origin);
       }
@@ -8346,6 +8374,7 @@
     }
 
     function finishRun(title, intro) {
+      try { missionEvent('finish', title) } catch (e) { }
       try { deliveryPanel(false) } catch (e) { }
       if ($('nitroBar')) $('nitroBar').hidden = true;
       try { celebrate(title, intro) } catch (e) { finishRunNow(title, intro) }
@@ -8614,6 +8643,7 @@
       const delta = last ? now - last : 0; last = now;
       const dt = Math.min(.05, Math.max(0, delta / 1000));
       if (mode === 'drag') { try { arrUpdate(dt) } catch (e) { console.error(e) } }
+      if (mode === 'race') { try { ghostTick() } catch (e) { } }
       if (mode === 'race') {
         update(dt);
         if (graphics === 'auto' && !autoLite && delta > 0 && delta < 160) {
@@ -8873,12 +8903,13 @@
         '<div class="qsPilot">Piloto nível ' + lv + ' · ' + career.credits + ' créditos</div>' +
         '<button type="button" class="qsMain" data-q="play">▶ Jogar agora<small>' + lastTxt + '</small></button>' +
         '<button type="button" data-q="career">🏆 Carreira<small>provas, medalhas e desbloqueios</small></button>' +
-        '<button type="button" data-q="drag">🏁 Arrancada Guamá<small>100 e 200 m · duelos · Corrida na Chave' + (career.drag?.pending ? ' · prova pendente' : '') + '</small></button>' +
+        '<button type="button" data-q="drag">🏁 Arrancada Guamá<small>100 e 200 m · duelos · Corrida na Chave' + (career.drag?.pending ? ' · prova pendente' : '') + '</small></button>' + (typeof missionsQs === 'function' ? missionsQs() : '') +
         '<button type="button" data-q="garage">🚗 Garagem e opções<small>carros, oficina, pistas, horário e clima</small></button>' +
-        '<button type="button" class="qsHelp" data-q="help">Como jogar</button><p class="qsSign">Criado por <b>Arnaldo Henrique de Oliveira Júnior</b></p></div>';
+        '<div class="qsLinks"><button type="button" class="qsHelp" data-q="help">Como jogar</button><button type="button" class="qsHelp" data-q="fb">💬 Enviar sugestão</button></div><p class="qsSign">Criado por <b>Arnaldo Henrique de Oliveira Júnior</b></p></div>';
       document.body.append(q);
       const close = () => q.remove();
       q.querySelector('[data-q="drag"]').onclick = () => { close(); openArrancada() };
+      { const mq = q.querySelector('[data-q="missions"]'); if (mq) mq.onclick = () => openMissions(); const fq = q.querySelector('[data-q="fb"]'); if (fq) fq.onclick = () => openFeedback() }
       q.querySelector('[data-q="play"]').onclick = () => {
         close();
         if (!cars.some((_, i) => carOwned(i))) { openArrancada(); return }
@@ -9905,6 +9936,7 @@
       }
       try { checkAchievements() } catch (e) { }
       try { savedToast() } catch (e) { }
+      try { missionEvent('drag', res) } catch (e) { }
       return res;
     }
     function arrShowResult(res, run) {
@@ -10491,7 +10523,7 @@
     try {
       $('start').addEventListener('click', () => {
         setTimeout(() => {
-          if (LAST) LAST.fresh = false;
+          if (LAST) LAST.fresh = false; const sbx = document.getElementById('shareBox'); if (sbx) sbx.hidden = true;
           if (mode === 'race' && shChalMatch()) { CHAL.active = true; shChalHud(true) } else { if (CHAL) CHAL.active = false; shChalHud(false) }
         }, 0);
       });
@@ -10507,6 +10539,8 @@
       const route = $('route').selectedIndex;
       LAST = { kind: 'race', route, car: model, time, pts, record, fresh: true, mode: $('gameMode').value };
       let txt = '';
+      try { missionEvent('race', { route, car: model, hits: raceHits }) } catch (e) { }
+      try { if (ghostSave(time)) txt += ' · 👻 novo fantasma salvo' } catch (e) { }
       if (CHAL && CHAL.active && shChalMatch()) {
         const d = time - CHAL.time;
         LAST.chal = { name: CHAL.name, diff: d, win: d < 0 };
@@ -10604,6 +10638,173 @@
     }
     // abre um desafio recebido pelo link
     setTimeout(() => { try { const c = shReadChallenge(); if (c) shShowChallenge(c) } catch (e) { } }, 900);
+    // ===================== MISSÕES DIÁRIAS · FANTASMA DO RECORDE · ENVIAR SUGESTÃO =====================
+    const GAME_VERSION = '1.3 · 21/11/2026';
+    // ---------- missões diárias ----------
+    const MS_REWARD = 100, MS_BONUS = 150;
+    function msDay() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }
+    function msRng(seed) { let h = 2166136261; for (const ch of seed) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296 } }
+    function msEnsure() {
+      const day = msDay(); let m = career.missions;
+      if (m && m.day === day && Array.isArray(m.list)) return m;
+      const r = msRng('curvas|' + day);
+      const okRoutes = routes.map((_, i) => i).filter(i => { try { return routeOwned(i) } catch (e) { return i < 3 } });
+      const okCars = cars.map((_, i) => i).filter(i => { try { return carOwned(i) } catch (e) { return false } });
+      const pool = ['route', 'clean', 'car', 'drag_win', 'drag_runs', 'delivery', 'escape'].filter(t => t !== 'car' || okCars.length);
+      for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]] }
+      const list = pool.slice(0, 3).map(t => {
+        const o = { t, prog: 0, goal: t === 'drag_runs' ? 3 : 1, done: false };
+        if (t === 'route') o.r = okRoutes[Math.floor(r() * okRoutes.length)] ?? 0;
+        if (t === 'car') o.c = okCars[Math.floor(r() * okCars.length)];
+        return o;
+      });
+      career.missions = { day, list, bonus: false };
+      try { localStorage.setItem(careerKey, JSON.stringify(career)) } catch (e) { }
+      return career.missions;
+    }
+    function msText(o) {
+      if (o.t === 'route') return 'Complete uma corrida na ' + String(routes[o.r]?.name || 'pista').split('·')[0].trim();
+      if (o.t === 'clean') return 'Termine uma corrida sem bater em nada';
+      if (o.t === 'car') return 'Complete uma corrida com o ' + (typeof arrNiceName === 'function' ? arrNiceName(o.c) : cars[o.c]?.name);
+      if (o.t === 'drag_win') return 'Vença um duelo na Arrancada Guamá';
+      if (o.t === 'drag_runs') return 'Faça 3 provas na Arrancada Guamá';
+      if (o.t === 'delivery') return 'Conclua uma entrega no Mercado da Baía';
+      if (o.t === 'escape') return 'Fuja da polícia no modo Fuga';
+      return 'Missão';
+    }
+    function msHint(o) {
+      if (o.t === 'delivery') return 'Garagem → Modo de jogo: Missão · Entrega';
+      if (o.t === 'escape') return 'Garagem → Modo de jogo: Fuga · polícia na cola';
+      if (o.t === 'drag_win' || o.t === 'drag_runs') return 'Tela inicial → Arrancada Guamá';
+      if (o.t === 'clean') return 'Vale qualquer pista, até a bandeirada';
+      return 'Vale em qualquer modo de corrida';
+    }
+    function missionEvent(kind, info) {
+      let m; try { m = msEnsure() } catch (e) { return }
+      const done = [];
+      for (const o of m.list) {
+        if (o.done) continue;
+        let hit = false;
+        if (kind === 'race') {
+          if (o.t === 'route' && info.route === o.r) hit = true;
+          if (o.t === 'clean' && info.hits === 0) hit = true;
+          if (o.t === 'car' && info.car === o.c) hit = true;
+        } else if (kind === 'finish') {
+          if (o.t === 'delivery' && info === 'Entrega concluída') hit = true;
+          if (o.t === 'escape' && info === 'Fugiu!') hit = true;
+        } else if (kind === 'drag') {
+          if (o.t === 'drag_win' && info.outcome === 'win' && (info.kind === 'duel' || info.kind === 'key')) hit = true;
+          if (o.t === 'drag_runs' && info.player && info.player.departed !== false && !info.forfeit) hit = true;
+        }
+        if (hit) { o.prog = Math.min(o.goal, o.prog + 1); if (o.prog >= o.goal) { o.done = true; career.credits += MS_REWARD; career.xp = (career.xp || 0) + 20; done.push(o) } }
+      }
+      if (!done.length) return;
+      let msg = '🎯 Missão cumprida: ' + msText(done[0]) + ' · +' + MS_REWARD * done.length + ' créditos';
+      if (!m.bonus && m.list.every(o => o.done)) { m.bonus = true; career.credits += MS_BONUS; msg = '🏆 Todas as missões de hoje! +' + (MS_REWARD * done.length + MS_BONUS) + ' créditos' }
+      try { localStorage.setItem(careerKey, JSON.stringify(career)) } catch (e) { }
+      try { padToast(msg) } catch (e) { }
+      try { msRefreshButtons() } catch (e) { }
+    }
+    const msCount = () => { try { const m = msEnsure(); return m.list.filter(o => o.done).length } catch (e) { return 0 } };
+    function msRefreshButtons() {
+      const n = msCount(), b = document.getElementById('missionsOpen'); if (b) b.textContent = '🎯 Missões de hoje · ' + n + '/3';
+    }
+    function missionsQs() { return '<button type="button" data-q="missions">🎯 Missões de hoje · ' + msCount() + '/3<small>' + MS_REWARD + ' créditos cada · bônus de ' + MS_BONUS + ' ao completar todas</small></button>' }
+    function openMissions() {
+      const m = msEnsure();
+      let el = document.getElementById('missionsModal'); if (el) el.remove();
+      el = document.createElement('div'); el.id = 'missionsModal'; el.className = 'xModal';
+      const tomorrow = (() => { const d = new Date(); d.setHours(24, 0, 0, 0); const h = Math.max(0, Math.floor((d - Date.now()) / 36e5)); return h + ' h' })();
+      el.innerHTML = '<div class="xCard"><button type="button" class="xClose" aria-label="Fechar">✕</button><div class="xTag">🎯 MISSÕES DE HOJE</div><h2>' + m.list.filter(o => o.done).length + ' de 3 cumpridas</h2>' +
+        m.list.map(o => '<div class="msRow' + (o.done ? ' ok' : '') + '"><b>' + (o.done ? '✅' : '⬜') + ' ' + msText(o) + '</b><small>' + (o.done ? 'Cumprida · +' + MS_REWARD + ' créditos' : msHint(o) + (o.goal > 1 ? ' · ' + o.prog + '/' + o.goal : '')) + '</small><span class="msBar"><i style="width:' + Math.round(o.prog / o.goal * 100) + '%"></i></span></div>').join('') +
+        '<p class="xSmall">' + (m.bonus ? '🏆 Bônus de ' + MS_BONUS + ' créditos já recebido hoje.' : 'Cumpra as 3 para ganhar mais ' + MS_BONUS + ' créditos de bônus.') + ' Novas missões em ' + tomorrow + '.</p></div>';
+      document.body.append(el);
+      el.addEventListener('click', e => { if (e.target === el || e.target.closest('.xClose')) el.remove() });
+    }
+    // ---------- fantasma do recorde ----------
+    const GH = { rec: null, play: null, last: -1, on: true };
+    try { GH.on = localStorage.getItem('pista-studio-fantasma') !== '0' } catch (e) { }
+    const ghKey = r => 'pista-studio-ghost-' + r;
+    function ghostEligible() { try { return !deliveryMode() && !chaseMode() } catch (e) { return false } }
+    function ghostStart() {
+      GH.rec = null; GH.play = null; GH.last = -1;
+      if (mode !== 'race' || !ghostEligible()) return;
+      const r = $('route').selectedIndex;
+      GH.rec = { r, car: model, pts: [] };
+      if (!GH.on) return;
+      try { const g = JSON.parse(localStorage.getItem(ghKey(r)) || 'null'); if (g && Array.isArray(g.p) && g.p.length > 10) { GH.play = g; roadNote = '👻 Fantasma do seu recorde: ' + fmt(g.t) + ' com o ' + (typeof arrNiceName === 'function' ? arrNiceName(g.car) : 'carro'); roadNoteTime = 3; try { showBonus() } catch (e) { } } } catch (e) { }
+    }
+    function ghostTick() {
+      if (!GH.rec || mode !== 'race') return;
+      const k = Math.floor(elapsed / .2); if (k <= GH.last) return;
+      GH.last = k; if (GH.rec.pts.length < 6000) GH.rec.pts.push(Math.round(z * 10) / 10, Math.round(x * 100) / 100);
+    }
+    function ghostSave(time) {
+      const g = GH.rec; GH.rec = null; if (!g || g.pts.length < 20) return false;
+      try {
+        const old = JSON.parse(localStorage.getItem(ghKey(g.r)) || 'null');
+        if (old && old.t <= time) return false;
+        localStorage.setItem(ghKey(g.r), JSON.stringify({ t: time, car: g.car, p: g.pts }));
+        return true;
+      } catch (e) { return false }
+    }
+    function ghostProp() {
+      const g = GH.play; if (!g || mode !== 'race') return null;
+      const n = g.p.length / 2, f = elapsed / .2, i = Math.min(n - 1, Math.floor(f)), j = Math.min(n - 1, i + 1), a = f - i;
+      if (i >= n - 1 && elapsed > g.t + 2) return null;
+      const s = g.p[i * 2] + (g.p[j * 2] - g.p[i * 2]) * a, l = g.p[i * 2 + 1] + (g.p[j * 2 + 1] - g.p[i * 2 + 1]) * a;
+      if (!g.type) g.type = { label: 'fantasma', sprite: 'car' + g.car, width: 1.75, height: 1.48, half: 2.05, speed: 0 };
+      return { s, lane: l, type: g.type, direction: 1, ghost: true, currentSpeed: 0 };
+    }
+    // ---------- enviar sugestão ----------
+    function fbDevice() {
+      const ua = navigator.userAgent;
+      const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : 'outro';
+      const br = /Edg\//.test(ua) ? 'Edge' : /CriOS|Chrome\//.test(ua) ? 'Chrome' : /FxiOS|Firefox/.test(ua) ? 'Firefox' : /Safari/.test(ua) ? 'Safari' : 'navegador';
+      return os + ' · ' + br + ' · tela ' + innerWidth + '×' + innerHeight;
+    }
+    function openFeedback() {
+      let el = document.getElementById('fbModal'); if (el) el.remove();
+      el = document.createElement('div'); el.id = 'fbModal'; el.className = 'xModal';
+      el.innerHTML = '<div class="xCard"><button type="button" class="xClose" aria-label="Fechar">✕</button><div class="xTag">💬 ENVIAR SUGESTÃO</div><h2>O que você achou do jogo?</h2>' +
+        '<div class="fbKinds"><button type="button" class="on" data-k="💡 Sugestão">💡 Sugestão</button><button type="button" data-k="🐞 Erro">🐞 Erro ou travada</button><button type="button" data-k="👍 Elogio">👍 Elogio</button></div>' +
+        '<textarea id="fbText" maxlength="800" placeholder="Escreva aqui: o que curtiu, o que deu errado ou o que você queria no jogo…"></textarea>' +
+        '<input type="text" id="fbName" maxlength="30" placeholder="Seu nome (opcional)">' +
+        '<p class="xSmall">Vai junto: versão do jogo, aparelho e navegador (' + fbDevice() + '). Nada além disso.</p>' +
+        '<div class="fbBtns"><button type="button" class="fbSend">Enviar pelo WhatsApp</button><button type="button" class="fbCopy">Copiar texto</button></div><p class="fbMsg" hidden></p></div>';
+      document.body.append(el);
+      let kind = '💡 Sugestão';
+      try { el.querySelector('#fbName').value = localStorage.getItem('pista-studio-nome') || '' } catch (e) { }
+      el.querySelectorAll('.fbKinds button').forEach(b => b.onclick = () => { kind = b.dataset.k; el.querySelectorAll('.fbKinds button').forEach(x => x.classList.toggle('on', x === b)) });
+      el.querySelectorAll('textarea, input').forEach(i => i.onkeydown = e => e.stopPropagation());
+      const build = () => {
+        const txt = el.querySelector('#fbText').value.trim(), nm = el.querySelector('#fbName').value.trim();
+        let ctxTxt = ''; try { ctxTxt = ' · pista: ' + String(routes[$('route').selectedIndex]?.name || '').split('·')[0].trim() + ' · carro: ' + (typeof arrNiceName === 'function' ? arrNiceName(model) : model) } catch (e) { }
+        return '🏁 Curvas do Pará · ' + kind + (nm ? ' de ' + nm : '') + '\n\n' + (txt || '(sem texto)') + '\n\n— versão ' + GAME_VERSION + ' · ' + fbDevice() + ctxTxt;
+      };
+      const say = t => { const m = el.querySelector('.fbMsg'); m.textContent = t; m.hidden = false };
+      el.querySelector('.fbSend').onclick = () => {
+        if (!el.querySelector('#fbText').value.trim()) { say('Escreva sua mensagem antes de enviar.'); return }
+        try { const nm = el.querySelector('#fbName').value.trim(); if (nm) localStorage.setItem('pista-studio-nome', nm.slice(0, 18)) } catch (e) { }
+        window.open('https://wa.me/?text=' + encodeURIComponent(build()), '_blank', 'noopener');
+        say('Escolha o contato do criador no WhatsApp e envie. Obrigado! 🙌');
+      };
+      el.querySelector('.fbCopy').onclick = async () => { try { await navigator.clipboard.writeText(build()); say('Texto copiado. Cole no WhatsApp para o criador.') } catch (e) { say('Não consegui copiar neste navegador.') } };
+      el.addEventListener('click', e => { if (e.target === el || e.target.closest('.xClose')) el.remove() });
+    }
+    // ---------- botões no menu ----------
+    try {
+      const bar = document.createElement('div'); bar.id = 'xBar';
+      bar.innerHTML = '<button type="button" id="missionsOpen">🎯 Missões de hoje · 0/3</button><button type="button" id="feedbackOpen">💬 Enviar sugestão</button><button type="button" id="ghostToggle"></button>';
+      const home = document.getElementById('homeOpen'); if (home) home.after(bar); else $('menu')?.prepend(bar);
+      bar.querySelector('#missionsOpen').onclick = openMissions;
+      bar.querySelector('#feedbackOpen').onclick = openFeedback;
+      const gt = bar.querySelector('#ghostToggle');
+      const gtTxt = () => { gt.textContent = '👻 Fantasma: ' + (GH.on ? 'ligado' : 'desligado') };
+      gt.onclick = () => { GH.on = !GH.on; try { localStorage.setItem('pista-studio-fantasma', GH.on ? '1' : '0') } catch (e) { } gtTxt() };
+      gtTxt(); msRefreshButtons();
+      $('start').addEventListener('click', () => setTimeout(() => { try { ghostStart() } catch (e) { } }, 0));
+    } catch (e) { }
 
     requestAnimationFrame(frame);
 
