@@ -5204,13 +5204,31 @@
         }
       }
       if (amb) {
-        const gap = z - amb.s, speedAmb = Math.max(v + 7, 24);
+        const gap = z - amb.s; let speedAmb = Math.max(v + 7, 24);
         const blocked = gap > 0 && gap < 9 && Math.abs(amb.lane - x) < 1.7;
+        // Trânsito: os carros à frente encostam para dar passagem; se ainda houver um carro na frente,
+        // a ambulância desvia para o lado livre ou espera atrás dele (nunca atravessa outro veículo)
+        const ambW = roadWidthAt(amb.s) - 1; let ambAim = null;
+        for (const tc of traffic) {
+          const ahead = tc.s - amb.s; if (ahead < -7 || ahead > 75) continue;
+          const lat = (tc.lane ?? 0) - amb.lane, half = (tc.type.width + ambType.width) * .5 + .35;
+          if (tc.direction > 0) {
+            if (ahead > 0 && Math.abs(lat) < half + 1.2) { tc.yieldDir = tc.lane >= amb.lane ? 1 : -1; tc.yieldTime = Math.max(tc.yieldTime || 0, .5) }
+            if (ahead > -6 && ahead < tc.type.half + ambType.half + 6 && Math.abs(lat) < half) {
+              speedAmb = Math.min(speedAmb, Math.max(4, (tc.currentSpeed ?? tc.type.speed) * .95));
+              ambAim = clamp(lat > 0 ? tc.lane - half - .3 : tc.lane + half + .3, -ambW, ambW);
+            }
+          } else if (ahead > -7 && ahead < 45 && Math.abs(lat) < half) {
+            ambAim = clamp(lat > 0 ? tc.lane - half - .3 : tc.lane + half + .3, -ambW, ambW);
+            if (ahead < tc.type.half + ambType.half + 4) speedAmb = Math.min(speedAmb, 6);
+          }
+        }
         amb.s += (blocked ? Math.min(speedAmb, v) : speedAmb) * dt;
+        if (ambAim != null) amb.lane += clamp(ambAim - amb.lane, -3 * dt, 3 * dt);
         if (gap > 0 && gap < 45 && !amb.warned) { amb.warned = true; roadNote = '🚑 Ambulância atrás! Dê passagem (vá para o lado)'; roadNoteTime = 3.2; showBonus() }
         // a ambulância escolhe a faixa livre; se você está no meio do caminho, ela espera
         // vem atrás de você na sua faixa; perto, mantém a faixa e espera você abrir caminho
-        if (gap > 26) amb.lane += clamp(x - amb.lane, -2 * dt, 2 * dt);
+        if (gap > 26 && ambAim == null) amb.lane += clamp(x - amb.lane, -2 * dt, 2 * dt);
         if (blocked) amb.behindTime += dt;
         if (gap < -4 && !amb.gaveWay) {
           amb.gaveWay = true;
