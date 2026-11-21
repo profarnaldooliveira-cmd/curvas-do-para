@@ -1,5 +1,7 @@
 # Pista Studio · Curvas do Pará
 
+Criado por **Arnaldo Henrique de Oliveira Júnior**.
+
 Jogo de carro no navegador com pistas do Pará. Funciona no celular e no PC, com teclado, toque ou controle de videogame.
 
 **Jogar:** https://profarnaldooliveira-cmd.github.io/curvas-do-para/

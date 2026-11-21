@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Pista Studio · Curvas do Pará</title>
   <meta name="description" content="Jogo de carro no navegador com pistas do Pará: Almirante Barroso, Doca, Orla do Atalaia, Arrancada Guamá e muito mais. Funciona no celular e no PC, com teclado, toque ou controle.">
+  <meta name="author" content="Arnaldo Henrique de Oliveira Júnior">
   <meta name="theme-color" content="#101916">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -16,7 +17,7 @@
   <meta name="apple-mobile-web-app-title" content="Curvas do Pará">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Curvas do Pará · Pista Studio">
-  <meta property="og:description" content="Jogo de carro com pistas do Pará. Jogue grátis no celular ou no PC.">
+  <meta property="og:description" content="Jogo de carro com pistas do Pará. Jogue grátis no celular ou no PC. Criado por Arnaldo Henrique de Oliveira Júnior.">
   <meta property="og:image" content="https://profarnaldooliveira-cmd.github.io/curvas-do-para/og.jpg">
   <meta property="og:url" content="https://profarnaldooliveira-cmd.github.io/curvas-do-para/">
   <meta name="twitter:card" content="summary_large_image">
@@ -1120,6 +1121,10 @@
     #ahKeys b { color: #d6ff60 }
     body.dragOn #ahStage:not([hidden]) ~ #ahKeys { bottom: auto; top: calc(max(8px, env(safe-area-inset-top)) + 150px) }
     body.dragOn #perfHud { top: auto !important; bottom: 64px !important; left: 10px !important; right: auto !important; transform: none !important }
+    #quickStart .qsSign, .gameSign { margin: 10px 0 0; text-align: center; font: 500 .78rem system-ui, sans-serif; color: #9fb39a; letter-spacing: .02em }
+    #quickStart .qsSign b, .gameSign b { color: #d6ff60; font-weight: 700 }
+    #menu .gameSign { grid-column: 1 / -1; padding: 12px 0 4px; opacity: .9 }
+    @media (max-height: 540px) and (orientation: landscape) { #quickStart .qsSign { grid-column: 1 / -1; margin-top: 4px } }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -8870,7 +8875,7 @@
         '<button type="button" data-q="career">🏆 Carreira<small>provas, medalhas e desbloqueios</small></button>' +
         '<button type="button" data-q="drag">🏁 Arrancada Guamá<small>100 e 200 m · duelos · Corrida na Chave' + (career.drag?.pending ? ' · prova pendente' : '') + '</small></button>' +
         '<button type="button" data-q="garage">🚗 Garagem e opções<small>carros, oficina, pistas, horário e clima</small></button>' +
-        '<button type="button" class="qsHelp" data-q="help">Como jogar</button></div>';
+        '<button type="button" class="qsHelp" data-q="help">Como jogar</button><p class="qsSign">Criado por <b>Arnaldo Henrique de Oliveira Júnior</b></p></div>';
       document.body.append(q);
       const close = () => q.remove();
       q.querySelector('[data-q="drag"]').onclick = () => { close(); openArrancada() };
@@ -9427,7 +9432,7 @@
       else if (ui.kind === 'key' && !ks.ok) block = ks.why;
       else if ((ui.kind === 'duel' || ui.kind === 'key') && !arrRivalPreview?.rival) block = 'Nenhum rival disponível agora.';
       h += '<div class="arrCta">' + (block ? '<p class="arrNote">' + block + '</p>' : '') + '<button type="button" class="arrGo" data-act="go" ' + (block ? 'disabled' : '') + '>' + (ui.kind === 'key' ? 'Revisar a Corrida na Chave' : 'Ir para a pista') + '</button></div>';
-      h += '<p class="arrHelp"><b>Como largar:</b> simples: toque em ACELERAR quando acender o verde. Profissional: segure FREIO, encha o giro com ACELERAR até a faixa verde do conta-giros e solte o FREIO no verde. Sair antes do verde queima a largada. Teclado: ↑/W acelera, ↓/S/Espaço freia, Shift/E sobe marcha, Ctrl/Q reduz. Controle: gatilho direito acelera, esquerdo freia, RB/R1 sobe e LB/L1 reduz marcha, A/✕ inicia a contagem, Start desiste.</p>';
+      h += '<p class="arrHelp"><b>Como largar:</b> simples: toque em ACELERAR quando acender o verde. Profissional: segure FREIO, encha o giro com ACELERAR até a faixa verde do conta-giros e solte o FREIO no verde. Sair antes do verde queima a largada. Teclado: ↑/W acelera, ↓/S/Espaço freia, Shift/E sobe marcha, Ctrl/Q reduz. Controle: gatilho direito acelera, esquerdo freia, RB/R1 sobe e LB/L1 reduz marcha, A/✕ inicia a contagem, Start desiste.</p><p class="gameSign">Arrancada Guamá · criado por <b>Arnaldo Henrique de Oliveira Júnior</b></p>';
       return h;
     }
     function arrWarnings(m) {
@@ -10305,6 +10310,8 @@
       home.onclick = () => { try { if (mode === 'menu') showQuickStart() } catch (e) { } };
       $('menu')?.prepend(home);
     } catch (e) { }
+    // assinatura do criador no fim do menu
+    try { const sg = document.createElement('p'); sg.className = 'gameSign'; sg.innerHTML = 'Curvas do Pará · criado por <b>Arnaldo Henrique de Oliveira Júnior</b>'; $('menu')?.append(sg) } catch (e) { }
     window.ARR = { open: openArrancada, close: closeArrancada, data: arrData, get R() { return R }, start: arrStartRace, finish: arrFinish, apply: arrApply, debug: ARR_DEBUG, est: arrEst, build: arrBuild,
       interrupt: arrInterrupt, beginTree: arrBeginTree, makeRival: arrMakeRival, fail: arrFail, shift: arrShiftCmd, input: arrIn, career: () => career, owned: arrOwned, needsRecovery: arrNeedsRecovery, cond: arrCond, heat: arrHeat, parts: arrParts, cfg: ARR_CFG, outcome: arrOutcome, usable: arrUsable, crit: arrCriticalParts };
     // ===================== CONTROLE (Xbox, PlayStation e genéricos) =====================
@@ -10591,6 +10598,7 @@
         // rodapé
         g.fillStyle = '#ffffff'; g.font = '800 54px system-ui, sans-serif'; g.fillText('Me supera? Jogue grátis:', W / 2, H - 190);
         g.fillStyle = '#d6ff60'; g.font = '700 40px system-ui, sans-serif'; g.fillText('profarnaldooliveira-cmd.github.io/curvas-do-para', W / 2, H - 120, W * .94);
+        g.fillStyle = '#a9c3a0'; g.font = '600 30px system-ui, sans-serif'; g.fillText('Criado por Arnaldo Henrique de Oliveira Júnior', W / 2, H - 60, W * .94);
         c.toBlob(b => b ? resolve(b) : reject(new Error('blob')), 'image/png');
       });
     }
