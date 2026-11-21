@@ -1072,6 +1072,27 @@
     }
     #homeOpen { grid-column: 1 / -1; justify-self: start; display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 2px; padding: 8px 14px; border-radius: 999px; border: 1px solid #ffffff33; background: #ffffff10; color: #e9eedf; font-weight: 700; cursor: pointer }
     #homeOpen:hover { border-color: #d6ff60; color: #d6ff60 }
+    #chalModal { position: fixed; inset: 0; z-index: 130; display: flex; align-items: center; justify-content: center; padding: 16px; background: #000b; font-family: system-ui, -apple-system, sans-serif; color: #e9eedf }
+    .chCard { width: min(440px, 100%); background: radial-gradient(ellipse at 50% 0%, #24442f, #0e1612 70%); border: 1px solid #d6ff6066; border-radius: 20px; padding: 22px; text-align: center }
+    .chTag { display: inline-block; background: #d6ff60; color: #10180f; font-weight: 900; letter-spacing: .1em; font-size: .75rem; padding: 4px 10px; border-radius: 999px }
+    .chCard h2 { margin: 12px 0 4px; font-size: 1.5rem }
+    .chTime { font: 900 2.6rem ui-monospace, SFMono-Regular, Menlo, monospace; color: #d6ff60; margin: 6px 0 }
+    .chCard p { margin: 6px 0 }
+    .chSmall { color: #a9b7a2; font-size: .82rem }
+    .chBtns { display: grid; gap: 8px; margin-top: 16px }
+    .chBtns button { padding: 13px; border-radius: 12px; font-weight: 800; font-size: 1rem; cursor: pointer; border: 1px solid #ffffff33; background: #ffffff12; color: #e9eedf }
+    .chBtns .chGo { background: linear-gradient(90deg, #d6ff60, #9be36a); color: #10180f; border: 0 }
+    #chalHud { position: fixed; left: 50%; top: calc(max(8px, env(safe-area-inset-top)) + 4px); transform: translateX(-50%); z-index: 60; background: #0e1612e6; color: #d6ff60; border: 1px solid #d6ff6066; padding: 6px 12px; border-radius: 999px; font: 800 .85rem system-ui, sans-serif; pointer-events: none; white-space: nowrap }
+    #chalHud[hidden], #shareBox[hidden] { display: none !important }
+    #shareBox, .shareBox { grid-column: 1 / -1; margin: 10px 0; padding: 12px; border-radius: 14px; background: #d6ff6012; border: 1px solid #d6ff6044 }
+    .shRow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px }
+    .shRow:first-of-type { margin-top: 0 }
+    .shName { flex: 1; min-width: 0; padding: 10px; border-radius: 10px; border: 1px solid #ffffff33; background: #0b120f; color: #e9eedf; font: inherit }
+    .shBtn { flex: 1; min-width: 150px; padding: 11px; border-radius: 10px; font-weight: 800; cursor: pointer; border: 1px solid #d6ff6066 !important; background: #d6ff60 !important; color: #10180f !important }
+    .shBtn.shCardBtn { background: #ffffff14 !important; color: #e9eedf !important }
+    .shChal { margin: 0 0 8px; font-weight: 800; color: #ffb347 }
+    .shChal.win { color: #8fe36a }
+    .shMsg { margin: 8px 0 0; font-size: .85rem; color: #c9d2bd }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -8357,6 +8378,7 @@
       $('touch').hidden = $('routeHUD').hidden = $('bonusPanel').hidden = $('hud').hidden = true;
       $('title').textContent = title;
       $('intro').textContent = intro;
+      try { shBoxUpdate() } catch (e) { }
       showCareer(); try { showParts() } catch (e) { }
       $('garage').hidden = $('menu').hidden = false;
     }
@@ -8490,6 +8512,7 @@
           result += ' · Infrações: ' + raceFines.map(f => f.label + (f.credits ? ' (−' + f.credits + ' cr)' : f.pts ? ' (−' + f.pts + ' pts)' : '')).join(', ') + (total ? ' · Multas: −' + total + ' créditos' : '');
         } else result += ' · Prova sem infrações';
         if (careerMode() && damage >= .01) { career.damage = career.damage || {}; career.damage[model] = Math.round(damage * 100) / 100; saveCareer(); result += ' · Dano ' + Math.round(damage * 100) + '% · conserte na oficina' }
+        try { result += shAfterRace(elapsed, finalPts, record) } catch (e) { }
         finishRun('Bandeirada!', 'Tempo ' + fmt(elapsed) + ' · ' + kmFormatter.format(z / 1000) + ' km' + result + (record ? ' · Melhor tempo ' + fmt(record) : ''));
         try { showReceipt(pay, finalPts) } catch (e) { }
       }
@@ -8613,8 +8636,8 @@
       } else if (mode === 'pause') $('start').click();
     }
     $('start').onclick = () => {
-      if (mode !== 'pause' && !dailyMode() && !carOwned($('car').selectedIndex)) { refreshGarageLocks(true); return }
-      if (mode !== 'pause' && !fixedRouteMode() && !routeOwned($('route').selectedIndex)) { refreshGarageLocks(true); return }
+      if (mode !== 'pause' && !dailyMode() && !shChalMatch() && !carOwned($('car').selectedIndex)) { refreshGarageLocks(true); return }
+      if (mode !== 'pause' && !fixedRouteMode() && !shChalMatch() && !routeOwned($('route').selectedIndex)) { refreshGarageLocks(true); return }
       if (mode !== 'pause') {
         z = v = elapsed = points = march = shiftTime = 0; skidMarks = [];
         if (dailyMode()) applyDaily();
@@ -9493,8 +9516,8 @@
     function arrStartRace(cfg) {
       arrEnsureDom();
       const d = arrData(), m = cfg.model;
-      const loaner = cfg.kind === 'rec';
-      const parts = loaner ? arrDefaultParts() : arrParts(m), cond = loaner ? { motor: 85, embreagem: 85, cambio: 85, pneus: 85 } : arrCond(m);
+      const loaner = cfg.kind === 'rec' || !carOwned(m); // desafio com carro que ainda não é seu: carro de fábrica, sem desgaste na garagem
+      const parts = loaner ? arrDefaultParts() : arrParts(m), cond = loaner ? (cfg.kind === 'rec' ? { motor: 85, embreagem: 85, cambio: 85, pneus: 85 } : Object.fromEntries(arrPartKeys(arrIsEV(m)).map(k => [k, 100]))) : arrCond(m);
       const pc = arrBuild(m, parts, cond);
       const P = arrRun(pc, { cond, heat: loaner ? { a: .2, b: .15 } : arrHeat(m) });
       P.shiftTime = cfg.trans === 'auto' ? .32 : .2; P.auto = cfg.trans === 'auto' || pc.ev;
@@ -9527,7 +9550,7 @@
       const id = cfg.id || ('d' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
       const fee = cfg.fee ?? (cfg.kind === 'duel' ? ARR_CFG.fee[cfg.dist][arrClassOf(est.et, cfg.dist)] : 0);
       R = { id, kind: cfg.kind, dist: cfg.dist, model: m, parts, rival: rv, P, A, phase: 'stage', t: 0, green: null, tree: null, fee, est, win, resume: !!cfg.resume,
-        trans: cfg.trans, loaner, smoke: [], msg: '', msgT: 0, done: false, lastGas: false, lastBrake: false, brakeRel: -9, hudAt: 0, endT: null, warnT: 0, shake: 0 };
+        trans: cfg.trans, loaner, chal: !!cfg.chal, smoke: [], msg: '', msgT: 0, done: false, lastGas: false, lastBrake: false, brakeRel: -9, hudAt: 0, endT: null, warnT: 0, shake: 0 };
       // esconde o menu do jogo e mostra a pista da arrancada
       arrHidden = ARR_HIDE.filter(i => $(i) && !$(i).hidden); arrHidden.forEach(i => $(i).hidden = true);
       try { document.getElementById('quickStart')?.remove() } catch (e) { }
@@ -9730,7 +9753,7 @@
       // desgaste (persistente)
       const pw = arrWear(P), aw = A ? arrWear(A) : null;
       const { outcome, reason } = arrOutcome(R.kind, why, pr, ar);
-      const res = { id: R.id, kind: R.kind, dist: R.dist, model: R.model, rival: R.rival, fee: R.fee, outcome, reason, player: pr, ai: ar, wearP: pw,
+      const res = { id: R.id, chal: R.chal, kind: R.kind, dist: R.dist, model: R.model, rival: R.rival, fee: R.fee, outcome, reason, player: pr, ai: ar, wearP: pw,
         condP: P.cond, heatP: P.heat, condA: A ? A.cond : null, heatA: A ? A.heat : null, est: R.est.et, loaner: R.loaner, broken: P.broken, brokenA: A?.broken };
       arrApply(res);
       const keep = R; R = null; arrLeave();
@@ -9769,7 +9792,8 @@
       if (!res.loaner && res.condP && carOwned(m)) { d.cond[m] = { ...res.condP }; d.heat[m] = { a: res.heatP.a, b: res.heatP.b, at: Date.now() } }
       if (res.kind === 'time') {
         const pr = res.player;
-        if (pr && pr.fin && !pr.foul) {
+        if (pr && pr.fin && !pr.foul && res.loaner) notes.push('Carro emprestado do desafio: tempo vale para o recorde, sem créditos.');
+        if (pr && pr.fin && !pr.foul && !res.loaner) {
           career.credits += 10; xp += 6;
           const key = m + ':' + res.dist, old = d.rec[key];
           if (!old || pr.et < old.et) { d.rec[key] = { et: pr.et, rt: pr.rt, trap: pr.trap, t100: pr.t100, at: Date.now() }; if (old) { career.credits += 20; notes.push('Novo recorde do carro (+20)') } else notes.push('Primeiro tempo registrado') }
@@ -9843,6 +9867,7 @@
         (res.notes?.length ? '<ul class="arNotes">' + res.notes.map(n => '<li>' + n + '</li>').join('') + '</ul>' : '') +
         (!res.loaner && carOwned(res.model) ? '<p class="arrSmall">Condição agora: ' + Object.entries(arrCond(res.model)).map(([k, v]) => arrPartLabel(k, res.model) + ' ' + Math.round(v) + '%').join(' · ') + '</p>' : '') +
         '<div class="arrBtns">' + (res.kind !== 'key' && (res.loaner || carOwned(res.model)) ? '<button type="button" class="arrGo" data-r="again">Correr de novo</button>' : '') + '<button type="button" data-r="shop">Oficina</button><button type="button" data-r="hub">Arrancada</button><button type="button" data-r="menu">Menu do jogo</button></div></div>';
+      try { const sv = shAfterDrag(res); if (sv) { const sb = document.createElement('div'); sb.className = 'shareBox'; sb.innerHTML = shBoxHTML(sv); box.querySelector('.arrBtns').before(sb); shWire(sb, sv) } } catch (e) { }
       box.hidden = false;
     }
     function arrResultClick(e) {
@@ -10295,6 +10320,178 @@
       }
       pad.prev = gp.buttons.map(x => !!x && (x.value || (x.pressed ? 1 : 0)) > .5);
     }
+    // ===================== DESAFIO POR LINK + CARD DE RESULTADO =====================
+    const SITE_URL = 'https://profarnaldooliveira-cmd.github.io/curvas-do-para/';
+    let CHAL = null, LAST = null;
+    const shName = () => { try { return (localStorage.getItem('pista-studio-nome') || '').slice(0, 18) } catch (e) { return '' } };
+    const shRouteName = r => String(routes[r]?.name || 'Pista').split('·')[0].trim();
+    const shCarName = c => { try { return arrNiceName(c) } catch (e) { return String(cars[c]?.name || 'Carro') } };
+    const shB64 = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const shUnB64 = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
+    function shChalURL(s) {
+      const o = s.kind === 'drag' ? { v: 1, k: 'd', c: s.car, d: s.dist, t: Math.round(s.time * 1000), n: shName() } : { v: 1, k: 'r', r: s.route, c: s.car, t: Math.round(s.time * 1000), n: shName() };
+      return SITE_URL + '?desafio=' + shB64(o);
+    }
+    function shTimeTxt(s) { return s.kind === 'drag' ? s.time.toFixed(3).replace('.', ',') + ' s' : fmt(s.time) }
+    function shText(s) {
+      const where = s.kind === 'drag' ? 'nos ' + s.dist + ' m da Arrancada Guamá' : 'na ' + shRouteName(s.route);
+      return '🏁 Fiz ' + shTimeTxt(s) + ' ' + where + ' com o ' + shCarName(s.car) + ' no Curvas do Pará. Duvido você me superar!';
+    }
+    // ----- desafio recebido -----
+    function shReadChallenge() {
+      try {
+        const q = new URLSearchParams(location.search).get('desafio');
+        if (q) { sessionStorage.setItem('pista-studio-desafio', q); history.replaceState(null, '', location.pathname) }
+        const raw = q || sessionStorage.getItem('pista-studio-desafio'); if (!raw) return null;
+        const o = shUnB64(raw);
+        if (!o || o.v !== 1 || !Number.isInteger(o.c) || !cars[o.c] || !(o.t > 0 && o.t < 36e5)) return null;
+        if (o.k === 'r' && !(Number.isInteger(o.r) && routes[o.r])) return null;
+        if (o.k === 'd' && ![100, 200].includes(o.d)) return null;
+        return { kind: o.k === 'd' ? 'drag' : 'race', route: o.r, car: o.c, dist: o.d, time: o.t / 1000, name: String(o.n || '').replace(/[<>&"]/g, '').slice(0, 18) || 'Um amigo', raw };
+      } catch (e) { return null }
+    }
+    function shShowChallenge(c) {
+      if (!c || document.getElementById('chalModal')) return;
+      const m = document.createElement('div'); m.id = 'chalModal';
+      const where = c.kind === 'drag' ? 'nos ' + c.dist + ' m da Arrancada Guamá' : 'na ' + shRouteName(c.route);
+      m.innerHTML = '<div class="chCard"><div class="chTag">🏁 DESAFIO</div><h2>' + c.name + ' te desafiou!</h2>' +
+        '<p class="chTime">' + shTimeTxt(c) + '</p><p>' + where + ' com o <b>' + shCarName(c.car) + '</b></p>' +
+        '<p class="chSmall">Você corre com o mesmo carro, mesmo que ainda não seja seu' + (c.kind === 'drag' ? ' (de fábrica)' : '') + '. Bata o tempo para vencer.</p>' +
+        '<div class="chBtns"><button type="button" class="chGo">Aceitar desafio</button><button type="button" class="chNo">Agora não</button></div></div>';
+      document.body.append(m);
+      m.querySelector('.chNo').onclick = () => { m.remove(); try { sessionStorage.removeItem('pista-studio-desafio') } catch (e) { } };
+      m.querySelector('.chGo').onclick = () => { m.remove(); shAccept(c) };
+    }
+    function shAccept(c) {
+      CHAL = c; try { sessionStorage.removeItem('pista-studio-desafio') } catch (e) { }
+      try { document.getElementById('quickStart')?.remove() } catch (e) { }
+      try { audio() } catch (e) { }
+      if (c.kind === 'drag') {
+        arrStartRace({ kind: 'time', dist: c.dist, model: c.car, trans: arrData().ui.trans || 'manual', chal: true });
+        return;
+      }
+      const gm = $('gameMode'); gm.value = 'free'; gm.dispatchEvent(new Event('change'));
+      const r = $('route'); r.selectedIndex = c.route; r.dispatchEvent(new Event('change'));
+      const k = $('car'); k.selectedIndex = c.car; k.dispatchEvent(new Event('change'));
+      setTimeout(() => $('start').click(), 120);
+    }
+    const shChalMatch = () => !!(CHAL && CHAL.kind === 'race' && $('gameMode').value === 'free' && $('route').selectedIndex === CHAL.route && $('car').selectedIndex === CHAL.car);
+    // depois do clique em Iniciar: liga o alvo do desafio na tela
+    try {
+      $('start').addEventListener('click', () => {
+        setTimeout(() => {
+          if (LAST) LAST.fresh = false;
+          if (mode === 'race' && shChalMatch()) { CHAL.active = true; shChalHud(true) } else { if (CHAL) CHAL.active = false; shChalHud(false) }
+        }, 0);
+      });
+    } catch (e) { }
+    function shChalHud(on) {
+      let el = document.getElementById('chalHud');
+      if (!el) { el = document.createElement('div'); el.id = 'chalHud'; document.body.append(el) }
+      el.hidden = !on; if (on) el.textContent = '🎯 Bata ' + shTimeTxt(CHAL) + ' de ' + CHAL.name;
+    }
+    setInterval(() => { const el = document.getElementById('chalHud'); if (el && !el.hidden && mode !== 'race' && mode !== 'pause') el.hidden = true }, 700);
+    // chamado na bandeirada (corrida normal)
+    function shAfterRace(time, pts, record) {
+      const route = $('route').selectedIndex;
+      LAST = { kind: 'race', route, car: model, time, pts, record, fresh: true, mode: $('gameMode').value };
+      let txt = '';
+      if (CHAL && CHAL.active && shChalMatch()) {
+        const d = time - CHAL.time;
+        LAST.chal = { name: CHAL.name, diff: d, win: d < 0 };
+        txt = d < 0 ? ' · 🏆 Você venceu o desafio de ' + CHAL.name + ' por ' + Math.abs(d).toFixed(2).replace('.', ',') + ' s' : ' · Desafio de ' + CHAL.name + ': faltaram ' + d.toFixed(2).replace('.', ',') + ' s';
+        CHAL.active = false;
+      }
+      return txt;
+    }
+    // chamado no resultado da arrancada
+    function shAfterDrag(res) {
+      const pr = res.player; if (!pr || pr.et == null || pr.foul) return null;
+      const s = { kind: 'drag', car: res.model, dist: res.dist, time: pr.et, rt: pr.rt, trap: pr.trap, outcome: res.outcome, fresh: true };
+      if (CHAL && CHAL.kind === 'drag' && res.chal && CHAL.car === res.model && CHAL.dist === res.dist) {
+        const d = pr.et - CHAL.time; s.chal = { name: CHAL.name, diff: d, win: d < 0 }; CHAL = null;
+      }
+      LAST = s; return s;
+    }
+    // ----- caixa de compartilhar -----
+    function shBoxHTML(s) {
+      const chal = s.chal ? '<p class="shChal ' + (s.chal.win ? 'win' : '') + '">' + (s.chal.win ? '🏆 Você venceu o desafio de ' + s.chal.name + ' por ' : 'Desafio de ' + s.chal.name + ': faltaram ') + Math.abs(s.chal.diff).toFixed(2).replace('.', ',') + ' s</p>' : '';
+      return chal + '<div class="shRow"><input type="text" maxlength="18" placeholder="Seu nome no desafio (opcional)" value="' + shName().replace(/"/g, '') + '" class="shName"></div>' +
+        '<div class="shRow"><button type="button" class="shBtn shChalBtn">📲 Desafiar amigo</button><button type="button" class="shBtn shCardBtn">🖼 Card do resultado</button></div><p class="shMsg" hidden></p>';
+    }
+    function shWire(box, s) {
+      const nm = box.querySelector('.shName'), msg = box.querySelector('.shMsg');
+      nm.oninput = () => { try { localStorage.setItem('pista-studio-nome', nm.value.trim()) } catch (e) { } };
+      nm.onkeydown = e => e.stopPropagation();
+      const say = t => { msg.textContent = t; msg.hidden = false };
+      box.querySelector('.shChalBtn').onclick = async () => {
+        const url = shChalURL(s), text = shText(s);
+        try { if (navigator.share) { await navigator.share({ title: 'Desafio · Curvas do Pará', text, url }); return } } catch (e) { if (e && e.name === 'AbortError') return }
+        try { await navigator.clipboard.writeText(text + ' ' + url); say('Link do desafio copiado. Cole no WhatsApp ou onde quiser.') } catch (e) { }
+        try { window.open('https://wa.me/?text=' + encodeURIComponent(text + ' ' + url), '_blank', 'noopener') } catch (e) { }
+      };
+      box.querySelector('.shCardBtn').onclick = async () => {
+        say('Gerando o card…');
+        try {
+          const blob = await shCard(s), file = new File([blob], 'curvas-do-para-resultado.png', { type: 'image/png' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try { await navigator.share({ files: [file], text: shText(s) + ' ' + shChalURL(s) }); msg.hidden = true; return } catch (e) { if (e && e.name === 'AbortError') { msg.hidden = true; return } }
+          }
+          const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.append(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+          say('Card salvo nos downloads. Poste no status ou nos stories!');
+        } catch (e) { say('Não consegui gerar o card neste navegador.') }
+      };
+    }
+    function shBoxUpdate() {
+      let box = document.getElementById('shareBox');
+      if (!LAST || !LAST.fresh || LAST.kind !== 'race' || mode !== 'finish') { if (box) box.hidden = true; return }
+      if (!box) { box = document.createElement('div'); box.id = 'shareBox'; $('intro').after(box) }
+      box.innerHTML = shBoxHTML(LAST); box.hidden = false; shWire(box, LAST);
+    }
+    // ----- card (imagem 1080x1920 para status e stories) -----
+    function shCard(s) {
+      return new Promise((resolve, reject) => {
+        const W = 1080, H = 1920, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+        const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#0a120e'); bg.addColorStop(.55, '#183424'); bg.addColorStop(1, '#0a120e');
+        g.fillStyle = bg; g.fillRect(0, 0, W, H);
+        g.save(); g.globalAlpha = .08; g.strokeStyle = '#d6ff60'; g.lineWidth = 3; for (let i = -H; i < W; i += 70) { g.beginPath(); g.moveTo(i, H); g.lineTo(i + H * .6, 0); g.stroke() } g.restore();
+        for (let i = 0; i < 18; i++) { g.fillStyle = i % 2 ? '#f2f2f2' : '#111'; g.fillRect(i * 60, 0, 60, 26); g.fillStyle = i % 2 ? '#111' : '#f2f2f2'; g.fillRect(i * 60, 26, 60, 26) }
+        g.textAlign = 'center'; g.fillStyle = '#a9c3a0'; g.font = '700 34px system-ui, sans-serif'; g.fillText('PISTA STUDIO', W / 2, 150);
+        g.fillStyle = '#d6ff60'; g.font = '900 104px system-ui, sans-serif'; g.fillText('Curvas do Pará', W / 2, 260);
+        g.fillStyle = '#ffffff'; g.font = '800 50px system-ui, sans-serif';
+        g.fillText(s.kind === 'drag' ? 'Arrancada Guamá · ' + s.dist + ' m' : shRouteName(s.route), W / 2, 360, W * .9);
+        // carro
+        let im = null;
+        try { const k = anglePhotoKey(s.car, 3); if (k && ready(images[k])) im = images[k] } catch (e) { }
+        if (!im) { try { im = paintedCarPhoto(s.car, customs[s.car]) } catch (e) { } }
+        if (!im || !(im.naturalWidth || im.width)) im = images['car' + s.car];
+        const floor = 1130;
+        const sh = g.createRadialGradient(W / 2, floor, 10, W / 2, floor, 430); sh.addColorStop(0, 'rgba(0,0,0,.6)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+        g.save(); g.translate(0, floor); g.scale(1, .18); g.translate(0, -floor); g.fillStyle = sh; g.beginPath(); g.arc(W / 2, floor, 430, 0, 7); g.fill(); g.restore();
+        if (im && (im.naturalWidth || im.width)) {
+          const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
+          let dw = 860, dh = dw * ih / iw; if (dh > 560) { dh = 560; dw = dh * iw / ih }
+          g.drawImage(im, W / 2 - dw / 2, floor - dh, dw, dh);
+        }
+        g.fillStyle = '#e9eedf'; g.font = '700 46px system-ui, sans-serif'; g.fillText(shCarName(s.car), W / 2, floor + 90, W * .9);
+        // tempo
+        g.fillStyle = '#d6ff60'; g.font = '900 190px ui-monospace, SFMono-Regular, Menlo, monospace'; g.fillText(shTimeTxt(s), W / 2, floor + 300, W * .94);
+        g.fillStyle = '#c9d2bd'; g.font = '600 40px system-ui, sans-serif';
+        const extra = s.kind === 'drag' ? 'reação ' + (s.rt ?? 0).toFixed(3).replace('.', ',') + ' s · ' + Math.round(s.trap || 0) + ' km/h na chegada' : (s.pts != null ? s.pts + ' pontos' : '') + (s.record && Math.abs(s.record - s.time) < .005 ? ' · 🏅 recorde pessoal' : '');
+        g.fillText(extra, W / 2, floor + 370, W * .9);
+        if (s.chal) {
+          g.fillStyle = s.chal.win ? '#8fe36a' : '#ffb347'; g.font = '800 46px system-ui, sans-serif';
+          g.fillText(s.chal.win ? '🏆 Venceu o desafio de ' + s.chal.name : 'Desafio de ' + s.chal.name + ': quase!', W / 2, floor + 450, W * .92);
+        }
+        // rodapé
+        g.fillStyle = '#ffffff'; g.font = '800 54px system-ui, sans-serif'; g.fillText('Me supera? Jogue grátis:', W / 2, H - 190);
+        g.fillStyle = '#d6ff60'; g.font = '700 40px system-ui, sans-serif'; g.fillText('profarnaldooliveira-cmd.github.io/curvas-do-para', W / 2, H - 120, W * .94);
+        c.toBlob(b => b ? resolve(b) : reject(new Error('blob')), 'image/png');
+      });
+    }
+    // abre um desafio recebido pelo link
+    setTimeout(() => { try { const c = shReadChallenge(); if (c) shShowChallenge(c) } catch (e) { } }, 900);
 
     requestAnimationFrame(frame);
 
