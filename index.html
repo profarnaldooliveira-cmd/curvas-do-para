@@ -5613,7 +5613,7 @@
         // Colado ao lado da câmera (saindo da tela): não desenha.
         if (depC <= 2.2 && Math.abs(latC) > 1.3) { ctx.restore(); return }
         // 0 = traseira (até ~30°), 1 = diagonal 3/4 (até ~66°), 2 = lateral. Histerese evita trocar de foto à toa.
-        const view = item.photoView ?? 0, up1 = .82, up2 = 1.16, gap = .12;
+        const view = item.photoView ?? 0, up1 = 1.02, up2 = 1.3, gap = .12;
         let next = view;
         if (view === 0 && ang > up1) next = ang > up2 ? 2 : 1;
         else if (view === 1) next = ang < up1 - gap ? 0 : ang > up2 ? 2 : 1;
@@ -10190,7 +10190,7 @@
           const b = pr(x, 0, zr); if (!b) return;
           const rear = arrImg(m); if (!rear) return;
           const ang = Math.atan2(Math.abs(x - cx), zr - cz) * 180 / Math.PI;
-          if (!isP) s.view = s.view === 'rr' ? (ang > 13 ? 'rr' : 'rear') : (ang > 17 ? 'rr' : 'rear');
+          s.view = 'rear'; // sempre de traseira, reto na faixa (a foto 3/4 deixava o carro de lado)
           const v = isP ? null : (s.view === 'rr' ? arrImg(m, 'rr') : null);
           let src = (v || rear).im; if (isP && !v) { try { src = paintedCarPhoto(m, customs[m]) || src } catch (e) { } }
           const bx = arrBox(src), sw = src.width * (bx.r - bx.l), shh = src.height * (bx.b - bx.t);
