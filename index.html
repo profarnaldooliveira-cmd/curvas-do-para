@@ -1111,6 +1111,8 @@
       #arrHud .ahTop, #ahWarn, #ahMsg, #ahQuit { zoom: 1.25 }
       .arrWrap { max-width: 980px }
     }
+    #ahCam { position: absolute; right: 10px; top: calc(max(8px, env(safe-area-inset-top)) + 128px); pointer-events: auto; background: #00000099; color: #fff; border: 1px solid #ffffff44; border-radius: 10px; padding: 6px 10px; font: inherit; font-size: .8rem; cursor: pointer }
+    @media (max-height: 460px) { #ahCam { top: calc(max(6px, env(safe-area-inset-top)) + 104px) } }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -9289,7 +9291,7 @@
         '<div class="ahGauge"><div class="ahRpm"><em id="ahWin"></em><i id="ahRpmFill"></i></div><div class="ahRow"><b id="ahGear">N</b><b id="ahSpeed">0</b><small>km/h</small><s id="ahShift">TROQUE</s></div></div></div>' +
         '<div class="ahDist"><b id="ahDist">0 m</b><small id="ahDistT">de 100 m</small><small id="ahSplit"></small></div></div>' +
         '<div id="ahWarn"></div><div id="ahMsg"></div>' +
-        '<div id="ahStage"></div><button type="button" id="ahQuit">Desistir</button>';
+        '<div id="ahStage"></div><button type="button" id="ahQuit">Desistir</button><button type="button" id="ahCam">🎥 Câmera</button>';
       document.body.append(hud);
       const t = document.createElement('div'); t.id = 'arrTouch'; t.hidden = true;
       t.innerHTML = '<button type="button" data-a="gd" class="atS">− marcha</button><button type="button" data-a="gu" class="atS atR">marcha +</button>' +
@@ -9304,6 +9306,7 @@
         b.oncontextmenu = e => e.preventDefault();
       });
       $('ahQuit').onclick = () => arrAskQuit();
+      $('ahCam').onclick = () => arrCycleCam();
       hub.addEventListener('click', arrHubClick);
       key.addEventListener('click', arrKeyClick);
       res.addEventListener('click', arrResultClick);
@@ -9579,6 +9582,7 @@
       try { audio() } catch (e) { }
       arrStageUI();
       arrHudUpdate(true);
+      try { $('ahCam').textContent = '🎥 ' + ARR_CAMS[arrCamIdx()].name } catch (e) { }
     }
     function arrStageUI() {
       const s = $('ahStage'); if (!R) return;
@@ -9963,6 +9967,14 @@
       } catch (e) { }
       arrBoxes.set(im, r); return r;
     }
+    // Câmeras da arrancada: altura e horizonte casados com o ângulo das fotos dos carros (tiradas de trás, um pouco de cima)
+    const ARR_CAMS = [
+      { name: 'Traseira', cy: 3.05, yH: .36, back: 0, cx: 1, ox: .66, oxP: .64, f: 1 },
+      { name: 'Alta', cy: 6.4, yH: .28, back: 5, cx: .55, ox: .6, oxP: .58, f: 1 },
+      { name: 'TV', cy: 3.6, yH: .37, back: 16, cx: 0, ox: .5, oxP: .5, f: 1.75 }
+    ];
+    function arrCamIdx() { try { return (career.drag?.ui?.cam | 0) % ARR_CAMS.length } catch (e) { return 0 } }
+    function arrCycleCam() { const d = arrData(); d.ui.cam = (arrCamIdx() + 1) % ARR_CAMS.length; try { localStorage.setItem(careerKey, JSON.stringify(career)) } catch (e) { } if (R) arrFlash('Câmera: ' + ARR_CAMS[d.ui.cam].name, 1.1); const b = document.getElementById('ahCam'); if (b) b.textContent = '🎥 ' + ARR_CAMS[d.ui.cam].name }
     function arrDraw() {
       arrMakeTextures();
       const g = ctx, W = w, H = h;
@@ -9971,9 +9983,10 @@
       const sh = R.shake * (Math.random() - .5);
       // câmera exatamente atrás do seu carro (alinhada com a faixa), com o centro óptico deslocado
       // para a direita: o carro anda reto na faixa e o rival continua visível na faixa ao lado
-      const f = Math.min(W * 1.02, H * 1.55) * (1 - Math.min(.1, P.v * .002)), yH = H * .41;
-      const back = Math.max(7, Math.min(9.5, f / (.135 * W)));
-      const cz = P.z - 3.6 - back - Math.min(2.6, P.v * .06), cx = L, cy = 2.1 + sh * .05, ox = W * (W < H ? .64 : .66);
+      const CAM = ARR_CAMS[arrCamIdx()] || ARR_CAMS[0];
+      const f = Math.min(W * 1.02, H * 1.55) * (1 - Math.min(.1, P.v * .002)) * CAM.f, yH = H * CAM.yH;
+      const back = Math.max(7, Math.min(9.5, f / CAM.f / (.135 * W))) * CAM.f + CAM.back;
+      const cz = P.z - 3.6 - back - Math.min(2.6, P.v * .06), cx = L * CAM.cx, cy = CAM.cy + sh * .05, ox = W * (CAM.cx === 0 ? .5 : W < H ? CAM.oxP : CAM.ox);
       const pr = (x, y, z) => { const dz = z - cz; if (dz < .3) return null; const k = f / dz; return [ox + (x - cx) * k + sh * 2, yH + (cy - y) * k, k] };
       const zN = cz + .45, zF = Math.min(cz + 520, 430);
       arrBackground(g, W, H, yH);
@@ -10198,6 +10211,7 @@
       if (c === 'ControlLeft' || c === 'KeyQ' || c === 'KeyN' || c === 'KeyZ') { e.preventDefault(); arrShiftCmd(-1) }
       if (c === 'Enter' && R && R.phase === 'stage') arrBeginTree();
       if (c === 'Escape') arrAskQuit();
+      if (c === 'KeyC') arrCycleCam();
     }, true);
     document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'drag') arrInterrupt() });
     addEventListener('pagehide', () => { if (mode === 'drag') arrInterrupt() });
@@ -10318,6 +10332,7 @@
         } else {
           if (edge(0) && R && R.phase === 'stage') arrBeginTree(); // A/✕: PRONTO
           if (edge(9)) arrAskQuit();                               // Start: desistir (2 toques)
+          if (edge(1)) arrCycleCam();                              // B/○: câmera
           if (R && (R.P.spin || (R.P.dead && !pad.deadBuzz))) { padRumble(R.P.dead ? .9 : .25, .5, R.P.dead ? 450 : 90); if (R.P.dead) pad.deadBuzz = true }
           if (!R || !R.P.dead) pad.deadBuzz = false;
         }
