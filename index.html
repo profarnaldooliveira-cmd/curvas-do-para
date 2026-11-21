@@ -1113,6 +1113,13 @@
     }
     #ahCam { position: absolute; right: 10px; top: calc(max(8px, env(safe-area-inset-top)) + 128px); pointer-events: auto; background: #00000099; color: #fff; border: 1px solid #ffffff44; border-radius: 10px; padding: 6px 10px; font: inherit; font-size: .8rem; cursor: pointer }
     @media (max-height: 460px) { #ahCam { top: calc(max(6px, env(safe-area-inset-top)) + 104px) } }
+    #ahKeys { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(12px, env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 12px; max-width: min(900px, 94vw); background: #0b0f0dcc; padding: 8px 14px; border-radius: 14px; font-size: .82rem; color: #e9eedf; text-shadow: none }
+    #ahKeys[hidden] { display: none !important }
+    #ahKeys span { white-space: nowrap }
+    #ahKeys kbd { display: inline-block; min-width: 20px; padding: 1px 6px; margin: 0 1px; border-radius: 6px; background: #ffffff1f; border: 1px solid #ffffff40; border-bottom-width: 2px; font: 700 .78rem ui-monospace, SFMono-Regular, Menlo, monospace; color: #fff; text-align: center }
+    #ahKeys b { color: #d6ff60 }
+    body.dragOn #ahStage:not([hidden]) ~ #ahKeys { bottom: auto; top: calc(max(8px, env(safe-area-inset-top)) + 150px) }
+    body.dragOn #perfHud { top: auto !important; bottom: 64px !important; left: 10px !important; right: auto !important; transform: none !important }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -9291,7 +9298,7 @@
         '<div class="ahGauge"><div class="ahRpm"><em id="ahWin"></em><i id="ahRpmFill"></i></div><div class="ahRow"><b id="ahGear">N</b><b id="ahSpeed">0</b><small>km/h</small><s id="ahShift">TROQUE</s></div></div></div>' +
         '<div class="ahDist"><b id="ahDist">0 m</b><small id="ahDistT">de 100 m</small><small id="ahSplit"></small></div></div>' +
         '<div id="ahWarn"></div><div id="ahMsg"></div>' +
-        '<div id="ahStage"></div><button type="button" id="ahQuit">Desistir</button><button type="button" id="ahCam">🎥 Câmera</button>';
+        '<div id="ahStage"></div><div id="ahKeys"></div><button type="button" id="ahQuit">Desistir</button><button type="button" id="ahCam">🎥 Câmera</button>';
       document.body.append(hud);
       const t = document.createElement('div'); t.id = 'arrTouch'; t.hidden = true;
       t.innerHTML = '<button type="button" data-a="gd" class="atS">− marcha</button><button type="button" data-a="gu" class="atS atR">marcha +</button>' +
@@ -9578,7 +9585,7 @@
       $('arrHub').hidden = true; $('arrResult').hidden = true; arrHubOpen = false;
       $('arrHud').hidden = false; $('arrTouch').hidden = !touchDevice; $('arrTouch').classList.toggle('ev', pc.ev); $('arrTouch').classList.toggle('auto', !!P.auto);
       arrIn.gas = arrIn.brake = false;
-      mode = 'drag'; keys.clear();
+      mode = 'drag'; keys.clear(); document.body.classList.add('dragOn'); arrKeysLast = '';
       try { audio() } catch (e) { }
       arrStageUI();
       arrHudUpdate(true);
@@ -9706,8 +9713,20 @@
       if (s.zFin == null && s.z >= R0.dist && s.departed) { s.zFin = R0.dist; s.tFin = t - (s.z - R0.dist) / Math.max(.1, s.v); s.vFin = s.v }
     }
     function arrFlash(t, s = 1.4) { R.msg = t; R.msgT = s }
+    // Legenda de comandos no PC (teclado) e com controle; no celular os botões de toque já mostram tudo
+    let arrKeysLast = '';
+    function arrKeysHint() {
+      const el = $('ahKeys'); if (!el || !R) return;
+      const usePad = typeof pad !== 'undefined' && pad.active, manual = !R.P.auto && !R.P.c.ev, stage = R.phase === 'stage';
+      let h = '';
+      if (usePad) h = '<b>🎮</b><span><kbd>RT</kbd> acelera</span><span><kbd>LT</kbd> freia</span>' + (manual ? '<span><kbd>RB</kbd> sobe marcha</span><span><kbd>LB</kbd> reduz</span>' : '') + (stage ? '<span><kbd>A</kbd> pronto</span>' : '') + '<span><kbd>B</kbd> câmera</span><span><kbd>Start</kbd> desistir</span>';
+      else if (!touchDevice) h = '<b>⌨</b><span><kbd>↑</kbd>/<kbd>W</kbd> acelera</span><span><kbd>↓</kbd>/<kbd>S</kbd> freia</span>' + (manual ? '<span><kbd>Shift</kbd>/<kbd>E</kbd> sobe marcha</span><span><kbd>Ctrl</kbd>/<kbd>Q</kbd> reduz</span>' : '') + (stage ? '<span><kbd>Enter</kbd> pronto</span>' : '') + '<span><kbd>C</kbd> câmera</span><span><kbd>Esc</kbd> desistir</span>';
+      if (h !== arrKeysLast) { el.innerHTML = h; el.hidden = !h; arrKeysLast = h }
+      const sh = $('ahShift'); if (sh) sh.textContent = usePad ? 'TROQUE · RB' : touchDevice ? 'TROQUE' : 'TROQUE · Shift';
+    }
     function arrHudUpdate(force) {
       if (!R) return; R.hudAt = performance.now();
+      arrKeysHint();
       const P = R.P, t = R.t;
       const tr = $('ahTree').children, on = (i, c) => tr[i].classList.toggle('on', !!c);
       const amb = R.ambers || [];
@@ -9756,6 +9775,7 @@
       R.done = true; R = null; arrLeave(); openArrancada('race');
     }
     function arrLeave() {
+      document.body.classList.remove('dragOn');
       mode = 'menu'; rpm = .15; v = 0; keys.clear(); arrIn.gas = arrIn.brake = false;
       $('arrHud').hidden = true; $('arrTouch').hidden = true;
       arrHidden.forEach(i => { if ($(i)) $(i).hidden = false }); arrHidden = [];
