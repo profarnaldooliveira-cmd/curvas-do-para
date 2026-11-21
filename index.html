@@ -9971,10 +9971,20 @@
     const ARR_CAMS = [
       { name: 'Traseira', cy: 3.05, yH: .36, back: 0, cx: 1, ox: .66, oxP: .64, f: 1 },
       { name: 'Alta', cy: 6.4, yH: .28, back: 5, cx: .55, ox: .6, oxP: .58, f: 1 },
-      { name: 'TV', cy: 3.6, yH: .37, back: 16, cx: 0, ox: .5, oxP: .5, f: 1.75 }
+      { name: 'TV', cy: 3.6, yH: .37, back: 16, cx: 0, ox: .5, oxP: .5, f: 1.75 },
+      { name: 'Cockpit', cockpit: true, cy: 1.18, yH: .4, back: 0, cx: 1, ox: .5, oxP: .5, f: .82 }
     ];
     function arrCamIdx() { try { return (career.drag?.ui?.cam | 0) % ARR_CAMS.length } catch (e) { return 0 } }
     function arrCycleCam() { const d = arrData(); d.ui.cam = (arrCamIdx() + 1) % ARR_CAMS.length; try { localStorage.setItem(careerKey, JSON.stringify(career)) } catch (e) { } if (R) arrFlash('Câmera: ' + ARR_CAMS[d.ui.cam].name, 1.1); const b = document.getElementById('ahCam'); if (b) b.textContent = '🎥 ' + ARR_CAMS[d.ui.cam].name }
+    // Cockpit: reaproveita o painel de cada carro do jogo, com velocidade, giro e marcha da arrancada
+    function arrCockpit() {
+      const sv = [model, v, rpm, march, wheelAngle, bodyRoll, elapsed, z, night, raining];
+      try {
+        model = R.model; v = R.P.v; rpm = Math.min(1, R.P.rpm); march = R.P.c.ev ? 1 : R.P.departed ? R.P.gear : 0;
+        wheelAngle = 0; bodyRoll = 0; elapsed = R.t; z = 0; night = false; raining = false;
+        ctx.save(); drawCockpit(cars[R.model]); ctx.restore();
+      } catch (e) { } finally { [model, v, rpm, march, wheelAngle, bodyRoll, elapsed, z, night, raining] = sv }
+    }
     function arrDraw() {
       arrMakeTextures();
       const g = ctx, W = w, H = h;
@@ -9986,7 +9996,7 @@
       const CAM = ARR_CAMS[arrCamIdx()] || ARR_CAMS[0];
       const f = Math.min(W * 1.02, H * 1.55) * (1 - Math.min(.1, P.v * .002)) * CAM.f, yH = H * CAM.yH;
       const back = Math.max(7, Math.min(9.5, f / CAM.f / (.135 * W))) * CAM.f + CAM.back;
-      const cz = P.z - 3.6 - back - Math.min(2.6, P.v * .06), cx = L * CAM.cx, cy = CAM.cy + sh * .05, ox = W * (CAM.cx === 0 ? .5 : W < H ? CAM.oxP : CAM.ox);
+      const cz = CAM.cockpit ? P.z - 2.35 : P.z - 3.6 - back - Math.min(2.6, P.v * .06), cx = CAM.cockpit ? L - .37 : L * CAM.cx, cy = CAM.cy + sh * (CAM.cockpit ? .02 : .05), ox = W * (CAM.cx === 0 || CAM.cockpit ? .5 : W < H ? CAM.oxP : CAM.ox);
       const pr = (x, y, z) => { const dz = z - cz; if (dz < .3) return null; const k = f / dz; return [ox + (x - cx) * k + sh * 2, yH + (cy - y) * k, k] };
       const zN = cz + .45, zF = Math.min(cz + 520, 430);
       arrBackground(g, W, H, yH);
@@ -10195,9 +10205,10 @@
         }]);
       };
       if (A) car(A, R.rival.m, -L, false);
-      car(P, R.model, L, true);
+      if (!CAM.cockpit) car(P, R.model, L, true);
       items.sort((a, b) => b[0] - a[0]);
       for (const it of items) { try { it[1]() } catch (e) { } }
+      if (CAM.cockpit) arrCockpit();
       // vinheta de velocidade
       if (P.v > 18) { const a = Math.min(.35, (P.v - 18) / 80); const gr = g.createRadialGradient(W / 2, H * .5, H * .3, W / 2, H * .5, H * .95); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,' + a + ')'); g.fillStyle = gr; g.fillRect(0, 0, W, H) }
     }
