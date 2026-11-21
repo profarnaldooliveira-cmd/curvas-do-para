@@ -9967,19 +9967,21 @@
         let fs = 26; while (g.measureText(t).width > 236 && fs > 12) { fs--; g.font = 'bold ' + fs + 'px system-ui, sans-serif' } g.fillText(t, 128, 25); g.fillStyle = '#ffffff22'; g.fillRect(0, 0, 256, 3); return c;
       });
       { const [c, g] = mk(64, 64); const gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(240,240,240,.9)'); gr.addColorStop(.5, 'rgba(225,225,225,.45)'); gr.addColorStop(1, 'rgba(220,220,220,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); arrTex.smoke = c }
+      const mips = c0 => { const out = [c0]; let c = c0; while (c.width > 24 && c.height > 6) { const n = document.createElement('canvas'); n.width = Math.max(1, c.width >> 1); n.height = Math.max(1, c.height >> 1); const x = n.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(c, 0, 0, n.width, n.height); out.push(n); c = n } return out };
+      arrTex.crowdM = mips(arrTex.crowd); arrTex.adsM = arrTex.ads.map(mips);
+      { const [c, g] = mk(256, 92); for (let j = 0; j < 7; j++) { const r = 22 + rand(j * 7.7) * 20, x = 40 + j * 30 + rand(j) * 10, y = 56 - Math.sin(j / 6 * Math.PI) * 18; const gr = g.createRadialGradient(x, y, 2, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(.7, 'rgba(255,255,255,.75)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill() } arrTex.cloud = c }
       try { arrTex.palms = [1, 2, 3, 4].map(s => tree(700 + s * 17, true)); arrTex.trees = [5, 6].map(s => tree(900 + s * 13, false)) } catch (e) { arrTex.palms = []; arrTex.trees = [] }
     }
     function arrBackground(g, W, H, yH) {
       const sc = canvas.width / Math.max(1, W);
-      if (!arrTex.bg || arrTex.bgW !== W || arrTex.bgH !== H) {
+      if (!arrTex.bg || arrTex.bgW !== W || arrTex.bgH !== H || arrTex.bgY !== yH) {
         const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(W * sc)); c.height = Math.max(1, Math.round((yH + 2) * sc));
         const b = c.getContext('2d'); b.scale(sc, sc);
         const sky = b.createLinearGradient(0, 0, 0, yH); sky.addColorStop(0, '#3f8fd6'); sky.addColorStop(.65, '#8cc4ea'); sky.addColorStop(1, '#d9ecf3');
         b.fillStyle = sky; b.fillRect(0, 0, W, yH + 2);
-        for (let i = 0; i < 9; i++) { // nuvens
-          const cx = rand(i * 3.1) * W, cy = yH * (.12 + rand(i * 5.7) * .45), s = W * (.05 + rand(i * 2.3) * .07);
-          b.fillStyle = 'rgba(255,255,255,.75)'; for (let j = 0; j < 5; j++) { b.beginPath(); b.ellipse(cx + (j - 2) * s * .55, cy + Math.sin(j * 1.7) * s * .12, s * (.5 + rand(i * 9 + j) * .3), s * .28, 0, 0, 7); b.fill() }
-        }
+        // brilho do sol (fim de manhã no Guamá)
+        const sun = b.createRadialGradient(W * .8, yH * .3, 2, W * .8, yH * .3, Math.max(W, yH) * .45); sun.addColorStop(0, 'rgba(255,250,225,.75)'); sun.addColorStop(.12, 'rgba(255,244,200,.32)'); sun.addColorStop(1, 'rgba(255,244,200,0)');
+        b.fillStyle = sun; b.fillRect(0, 0, W, yH + 2);
         // prédios de Belém ao longe
         for (let i = 0; i < 14; i++) { const bx = W * (.05 + i * .028 + rand(i) * .01), bw = W * .018, bh = yH * (.06 + rand(i * 4.4) * .1); b.fillStyle = 'rgba(120,140,155,.55)'; b.fillRect(bx, yH - bh, bw, bh) }
         // mata de açaizeiros na linha do horizonte
@@ -9988,9 +9990,19 @@
         b.lineTo(W, yH + 2); b.fill();
         b.strokeStyle = '#234a2b'; b.lineWidth = 1.4;
         for (let i = 0; i < 46; i++) { const x = rand(i * 7.7) * W, hh = 10 + rand(i * 3.3) * 16; b.beginPath(); b.moveTo(x, yH - 3); b.lineTo(x + 1, yH - hh); b.stroke(); b.fillStyle = '#244b2c'; for (let k = 0; k < 6; k++) { b.beginPath(); b.ellipse(x + 1 + Math.cos(k) * 5, yH - hh + Math.sin(k) * 2, 6, 1.6, k, 0, 7); b.fill() } }
-        arrTex.bg = c; arrTex.bgW = W; arrTex.bgH = H;
+        arrTex.bg = c; arrTex.bgW = W; arrTex.bgH = H; arrTex.bgY = yH;
       }
       g.drawImage(arrTex.bg, 0, 0, W, yH + 2);
+      // nuvens em duas camadas que andam devagar (dão profundidade ao céu)
+      if (arrTex.cloud) {
+        const t = performance.now() / 1000;
+        for (let i = 0; i < 8; i++) {
+          const far = i < 4, sp = far ? 3 : 7, cw = W * (far ? .16 : .26) * (.7 + rand(i * 2.3) * .6), ch = cw * .36;
+          const span = W + cw * 2, x = ((rand(i * 3.1) * span + t * sp) % span) - cw, y = yH * (far ? .45 + rand(i * 5.7) * .25 : .08 + rand(i * 5.7) * .3);
+          g.globalAlpha = far ? .55 : .85; g.drawImage(arrTex.cloud, x, y, cw, ch);
+        }
+        g.globalAlpha = 1;
+      }
     }
     const arrBoxes = new WeakMap();
     function arrBox(im) {
@@ -10048,12 +10060,16 @@
       };
       // ---- chão (tudo que é plano) ----
       flat(-30, -5.9, -40, 250, '#6f6f68');       // calçada e pé da arquibancada
+      flat(-8.6, -5.9, -25, 235, 'rgba(0,0,0,.2)'); // sombra da cobertura da arquibancada
       flat(5.9, 9.4, -40, 140, '#4a4d50');        // pista dos boxes
       flat(5.95, 6.1, -40, 140, '#e9e9e0');
       flat(-5.4, 5.4, -40, 345, '#3b3e41');       // asfalto
       for (let z = Math.floor(zN / 10) * 10; z < Math.min(345, zF); z += 10) if (Math.floor(z / 10) % 2) flat(-5.4, 5.4, z, z + 10, '#383a3d');
       flat(-5.4, 5.4, -40, 0, '#55575a');          // área de pré-largada (concreto)
       for (const lx of [-L, L]) for (const o of [-.75, .75]) { flat(lx + o - .25, lx + o + .25, -6, 40, 'rgba(10,10,10,.55)'); flat(lx + o - .22, lx + o + .22, 40, 110, 'rgba(10,10,10,.32)'); flat(lx + o - .2, lx + o + .2, 110, 200, 'rgba(10,10,10,.16)') }
+      for (let zz = 25; zz < 345; zz += 25) flat(-5.4, 5.4, zz, zz + .12, 'rgba(0,0,0,.18)');   // juntas do concreto
+      for (let i = 0; i < 16; i++) { const zz = 30 + i * 19 + rand(i * 4.1) * 8, xx = -4.2 + rand(i * 2.7) * 7.6, ww = .6 + rand(i * 9.1) * 1.4; flat(xx, Math.min(5.3, xx + ww), zz, zz + 1 + rand(i) * 2.5, 'rgba(0,0,0,.07)') }
+      flat(-5.4, -4.6, -40, 345, 'rgba(0,0,0,.08)'); flat(4.6, 5.4, -40, 345, 'rgba(0,0,0,.08)');   // sujeira junto ao guard-rail
       flat(-4.45, -4.3, -40, 345, '#efefe6'); flat(4.3, 4.45, -40, 345, '#efefe6'); flat(-.08, .08, -40, 345, '#efefe6');
       flat(-4.3, 4.3, 0, .35, '#ffffff');          // linha de largada
       flat(-4.3, 4.3, 100, 100.35, R.dist === 100 ? '#ffffff' : '#ffd23f');
@@ -10065,7 +10081,11 @@
       // ---- objetos em pé (ordenados de longe para perto) ----
       const items = [];
       const quad = (pts, col) => { if (pts.some(p => !p)) return false; g.fillStyle = col; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); g.fill(); return true };
-      const tex = (img, tl, tr, bl, u0 = 0, u1 = 1) => { if (!tl || !tr || !bl) return; const sw = img.width * (u1 - u0); if (sw < 1) return; g.save(); g.transform((tr[0] - tl[0]) / sw, (tr[1] - tl[1]) / sw, (bl[0] - tl[0]) / img.height, (bl[1] - tl[1]) / img.height, tl[0], tl[1]); g.drawImage(img, img.width * u0, 0, sw, img.height, 0, 0, sw, img.height); g.restore() };
+      const tex = (img, tl, tr, bl, u0 = 0, u1 = 1) => { if (!tl || !tr || !bl) return;
+        if (Array.isArray(img)) { // escolhe o nível de detalhe do tamanho certo para a tela
+          const sc = canvas.width / Math.max(1, W), lu = Math.hypot(tr[0] - tl[0], tr[1] - tl[1]) * sc / Math.max(.01, u1 - u0), lv = Math.hypot(bl[0] - tl[0], bl[1] - tl[1]) * sc;
+          let m = img[0]; for (const c of img) { if (c.width >= lu * .9 && c.height >= lv * .9) m = c; else break } img = m;
+        } const sw = img.width * (u1 - u0); if (sw < 1) return; g.save(); g.transform((tr[0] - tl[0]) / sw, (tr[1] - tl[1]) / sw, (bl[0] - tl[0]) / img.height, (bl[1] - tl[1]) / img.height, tl[0], tl[1]); g.drawImage(img, img.width * u0, 0, sw, img.height, 0, 0, sw, img.height); g.restore() };
       // textura em plano vertical ao longo da pista, subdividida perto da câmera para não deformar
       const texZ = (img, xa, ya, xb, yb, z0, z1, u0, u1, depth = 0) => {
         if (depth < 6 && (z1 - cz) / Math.max(.01, z0 - cz) > 1.18) {
@@ -10082,8 +10102,8 @@
           const xw = -8.6, xb = -21;
           quad([pr(xw, 0, z0), pr(xw, 0, z1), pr(xw, 1.3, z1), pr(xw, 1.3, z0)], '#2a2f33');
           const ua = (z0 - z) / 5;
-          texZ(arrTex.ads[ii % arrTex.ads.length], xw, 1.25, xw, .1, z0, z1, ua, 1);
-          if (quad([pr(xw, 1.3, z0), pr(xw, 1.3, z1), pr(xb, 8.6, z1), pr(xb, 8.6, z0)], '#5b6168')) texZ(arrTex.crowd, xb, 8.6, xw, 1.3, z0, z1, ua, 1);
+          texZ(arrTex.adsM[ii % arrTex.adsM.length], xw, 1.25, xw, .1, z0, z1, ua, 1);
+          if (quad([pr(xw, 1.3, z0), pr(xw, 1.3, z1), pr(xb, 8.6, z1), pr(xb, 8.6, z0)], '#5b6168')) texZ(arrTex.crowdM, xb, 8.6, xw, 1.3, z0, z1, ua, 1);
           quad([pr(xb, 8.6, z0), pr(xb, 8.6, z1), pr(xb, 10.6, z1), pr(xb, 10.6, z0)], '#3a4046');
           quad([pr(-7.6, 11, z0), pr(-7.6, 11, z1), pr(-22, 11.2, z1), pr(-22, 11.2, z0)], '#252a2e');
           quad([pr(-7.6, 10.5, z0), pr(-7.6, 10.5, z1), pr(-7.6, 11.1, z1), pr(-7.6, 11.1, z0)], ii % 2 ? '#d6ff60' : '#1c2a22');
