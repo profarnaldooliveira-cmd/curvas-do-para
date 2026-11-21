@@ -1157,6 +1157,10 @@
     .pvpKeys kbd { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 5px; background: #ffffff1f; border: 1px solid #ffffff40; border-bottom-width: 2px; font: 700 .78rem ui-monospace, Menlo, monospace; text-align: center }
     #ahKeys .pv1, #ahKeys .pv2 { max-width: 100%; white-space: normal; text-align: center }
     @media (max-width: 700px) { #arrHud.pvp .ahTree { display: none !important } }
+    .xBtns { display: grid; gap: 10px; margin-top: 14px }
+    .xBtns button { text-align: left; padding: 12px 14px; border-radius: 14px; border: 1px solid #ffffff33; background: #ffffff10; color: #fff; font: 800 1rem system-ui, sans-serif; cursor: pointer }
+    .xBtns button small { display: block; font-weight: 500; font-size: .78rem; color: #b9c6b2; margin-top: 3px }
+    .xBtns button:hover { border-color: #d6ff60 }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -8813,7 +8817,7 @@
     // ---------- Progresso: código para levar a outro aparelho/navegador (funciona dentro do link, sem baixar arquivo) ----------
     function saveBundle() {
       return { v: 1, career: localStorage.getItem(careerKey), setups: localStorage.getItem(setupKey), customs: localStorage.getItem(customKey),
-        graphics: localStorage.getItem('pista-studio-graphics'), cam: localStorage.getItem('pista-studio-cam-v1'), diff: localStorage.getItem('pista-studio-diff') };
+        graphics: localStorage.getItem('pista-studio-graphics'), cam: localStorage.getItem('pista-studio-cam-v1'), diff: localStorage.getItem('pista-studio-diff'), nome: localStorage.getItem('pista-studio-nome'), fantasma: localStorage.getItem('pista-studio-fantasma') };
     }
     const toCode = obj => 'PISTA1-' + btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
     function fromCode(code) {
@@ -8835,11 +8839,18 @@
         '<p style="margin:6px 0 10px;opacity:.8;font-size:.86rem">' + (exp ? 'Copie e guarde (WhatsApp, notas…). No outro celular ou navegador, abra o jogo e use “Colar código do progresso”.' : 'Cole aqui o código copiado no outro aparelho. O progresso atual deste navegador será substituído.') + '</p>' +
         '<textarea style="width:100%;height:110px;box-sizing:border-box;border-radius:8px;border:1px solid #ffffff33;background:#0b1211;color:#d8f1e4;font:11px ui-monospace,monospace;padding:8px" ' + (exp ? 'readonly' : 'placeholder="PISTA1-…"') + '></textarea>' +
         '<p data-msg style="min-height:1.2em;margin:6px 0;font-size:.85rem;color:#ffd27a"></p>' +
-        '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" data-close style="padding:8px 14px">Fechar</button><button type="button" data-go style="padding:8px 14px;font-weight:700">' + (exp ? 'Copiar' : 'Aplicar progresso') + '</button></div>';
+        '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" data-close style="padding:8px 14px">Fechar</button>' + (exp ? '' : '<button type="button" data-paste style="padding:8px 14px">📋 Colar</button>') + '<button type="button" data-go style="padding:8px 14px;font-weight:700">' + (exp ? 'Copiar' : 'Aplicar progresso') + '</button></div>';
       box.append(card); document.body.append(box);
       const ta = card.querySelector('textarea'), msg = card.querySelector('[data-msg]');
       if (exp) { ta.value = toCode(saveBundle()); setTimeout(() => { ta.focus(); ta.select() }, 30) }
       card.querySelector('[data-close]').onclick = () => box.remove();
+      if (!exp) {
+        setTimeout(() => { try { ta.focus() } catch (e) { } }, 30);
+        card.querySelector('[data-paste]').onclick = async () => {
+          try { const t = await navigator.clipboard.readText(); if (!t) throw 0; ta.value = t.trim(); msg.style.color = '#7fe0a6'; msg.textContent = 'Código colado. Toque em “Aplicar progresso”.' }
+          catch (e) { ta.focus(); msg.style.color = '#ffd27a'; msg.textContent = 'O navegador não liberou a colagem automática: toque e segure dentro da caixa e escolha “Colar”.' }
+        };
+      }
       box.onclick = ev => { if (ev.target === box) box.remove() };
       card.querySelector('[data-go]').onclick = async () => {
         if (exp) {
@@ -8857,6 +8868,8 @@
             if (data.graphics) localStorage.setItem('pista-studio-graphics', data.graphics);
             if (data.cam) localStorage.setItem('pista-studio-cam-v1', data.cam);
             if (data.diff) localStorage.setItem('pista-studio-diff', data.diff);
+            if (data.nome) localStorage.setItem('pista-studio-nome', data.nome);
+            if (data.fantasma) localStorage.setItem('pista-studio-fantasma', data.fantasma);
             msg.style.color = '#7fe0a6'; msg.textContent = 'Progresso aplicado ✓ Recarregando…';
             setTimeout(() => location.reload(), 700);
           } catch (e) { msg.style.color = '#ff8a7a'; msg.textContent = 'Código inválido. Confira se copiou ele inteiro.' }
@@ -10957,13 +10970,29 @@
       el.querySelector('.fbCopy').onclick = async () => { try { await navigator.clipboard.writeText(build()); say('Texto copiado. Cole no WhatsApp para o criador.') } catch (e) { say('Não consegui copiar neste navegador.') } };
       el.addEventListener('click', e => { if (e.target === el || e.target.closest('.xClose')) el.remove() });
     }
+    // ---------- levar o progresso para outro aparelho/navegador (sempre visível no menu) ----------
+    function openSaveMenu() {
+      document.getElementById('saveMenu')?.remove();
+      const el = document.createElement('div'); el.id = 'saveMenu'; el.className = 'xModal';
+      el.innerHTML = '<div class="xCard"><button type="button" class="xClose" aria-label="Fechar">✕</button><div class="xTag">💾 PROGRESSO</div><h2>Levar meu progresso</h2>' +
+        '<p class="xSmall">Seus créditos, carros, peças, recordes e a Arrancada ficam salvos neste navegador. Para passar para outro celular, outro navegador ou a versão nova do site, use o código.</p>' +
+        '<div class="xBtns"><button type="button" data-s="export">📤 Copiar meu código<small>no aparelho/versão onde está o progresso</small></button>' +
+        '<button type="button" data-s="import">📥 Colar um código<small>no aparelho/versão que vai receber o progresso</small></button></div></div>';
+      document.body.append(el);
+      el.addEventListener('click', e => {
+        const b = e.target.closest('[data-s]');
+        if (b) { el.remove(); saveModal(b.dataset.s); return }
+        if (e.target === el || e.target.closest('.xClose')) el.remove();
+      });
+    }
     // ---------- botões no menu ----------
     try {
       const bar = document.createElement('div'); bar.id = 'xBar';
-      bar.innerHTML = '<button type="button" id="missionsOpen">🎯 Missões de hoje · 0/3</button><button type="button" id="feedbackOpen">💬 Enviar sugestão</button><button type="button" id="ghostToggle"></button>';
+      bar.innerHTML = '<button type="button" id="missionsOpen">🎯 Missões de hoje · 0/3</button><button type="button" id="feedbackOpen">💬 Enviar sugestão</button><button type="button" id="ghostToggle"></button><button type="button" id="saveOpen">💾 Levar meu progresso</button>';
       const home = document.getElementById('homeOpen'); if (home) home.after(bar); else $('menu')?.prepend(bar);
       bar.querySelector('#missionsOpen').onclick = openMissions;
       bar.querySelector('#feedbackOpen').onclick = openFeedback;
+      bar.querySelector('#saveOpen').onclick = openSaveMenu;
       const gt = bar.querySelector('#ghostToggle');
       const gtTxt = () => { gt.textContent = '👻 Fantasma: ' + (GH.on ? 'ligado' : 'desligado') };
       gt.onclick = () => { GH.on = !GH.on; try { localStorage.setItem('pista-studio-fantasma', GH.on ? '1' : '0') } catch (e) { } gtTxt() };
