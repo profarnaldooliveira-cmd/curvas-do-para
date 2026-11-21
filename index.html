@@ -8817,7 +8817,7 @@
     // ---------- Progresso: código para levar a outro aparelho/navegador (funciona dentro do link, sem baixar arquivo) ----------
     function saveBundle() {
       return { v: 1, career: localStorage.getItem(careerKey), setups: localStorage.getItem(setupKey), customs: localStorage.getItem(customKey),
-        graphics: localStorage.getItem('pista-studio-graphics'), cam: localStorage.getItem('pista-studio-cam-v1'), diff: localStorage.getItem('pista-studio-diff'), nome: localStorage.getItem('pista-studio-nome'), fantasma: localStorage.getItem('pista-studio-fantasma') };
+        graphics: localStorage.getItem('pista-studio-graphics'), cam: localStorage.getItem('pista-studio-cam-v1'), diff: localStorage.getItem('pista-studio-diff'), nome: localStorage.getItem('pista-studio-nome'), fantasma: localStorage.getItem('pista-studio-fantasma'), recs: (() => { const o = {}; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^pista-studio-(duel-time|career-time|regional):|^pista-studio-(daily|champ)-v1$/.test(k)) o[k] = localStorage.getItem(k) } } catch (e) { } return o })() };
     }
     const toCode = obj => 'PISTA1-' + btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
     function fromCode(code) {
@@ -8870,6 +8870,7 @@
             if (data.diff) localStorage.setItem('pista-studio-diff', data.diff);
             if (data.nome) localStorage.setItem('pista-studio-nome', data.nome);
             if (data.fantasma) localStorage.setItem('pista-studio-fantasma', data.fantasma);
+            if (data.recs && typeof data.recs === 'object') for (const k in data.recs) if (/^pista-studio-/.test(k) && typeof data.recs[k] === 'string') localStorage.setItem(k, data.recs[k]);
             msg.style.color = '#7fe0a6'; msg.textContent = 'Progresso aplicado ✓ Recarregando…';
             setTimeout(() => location.reload(), 700);
           } catch (e) { msg.style.color = '#ff8a7a'; msg.textContent = 'Código inválido. Confira se copiou ele inteiro.' }
