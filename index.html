@@ -1151,6 +1151,12 @@
     .fbBtns button { padding: 12px; border-radius: 12px; font-weight: 800; cursor: pointer; border: 1px solid #ffffff33; background: #ffffff12; color: #e9eedf }
     .fbBtns .fbSend { background: linear-gradient(90deg, #d6ff60, #9be36a); color: #10180f; border: 0 }
     .fbMsg { margin: 10px 0 0; color: #c9d2bd; font-size: .85rem }
+    #arrHud.pvp .ahMid, #arrHud.pvp .ahDist, #arrHud.pvp #ahWarn, #arrHud.pvp #ahShift { display: none !important }
+    #ahKeys .pv1 b { color: #d6ff60 } #ahKeys .pv2 b { color: #7cc8ff }
+    .pvpKeys p { margin: 6px 0 10px; line-height: 1.6 }
+    .pvpKeys kbd { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 5px; background: #ffffff1f; border: 1px solid #ffffff40; border-bottom-width: 2px; font: 700 .78rem ui-monospace, Menlo, monospace; text-align: center }
+    #ahKeys .pv1, #ahKeys .pv2 { max-width: 100%; white-space: normal; text-align: center }
+    @media (max-width: 700px) { #arrHud.pvp .ahTree { display: none !important } }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -9418,17 +9424,31 @@
         return '<button type="button" data-car="' + i + '" class="' + (ui.model === i ? 'on' : '') + '"><img alt="" src="' + arrThumb(i) + '"><b>' + arrNiceName(i) + '</b><small>Cat. ' + arrClass(i, dist) + ' · ' + Math.round(minC) + '%' + (crit ? ' · ⚠ falha' : '') + '</small></button>';
       }).join('') + '</div>';
     }
+    function arrPvpBlock(ui, owned) {
+      if (!Number.isInteger(ui.model2) || !carOwned(ui.model2)) ui.model2 = owned.find(i => i !== ui.model) ?? ui.model;
+      let h = '<h3>Carro do J2 <small>(faixa da esquerda)</small></h3><div class="arrCars">' + owned.map(i => '<button type="button" data-car2="' + i + '" class="' + (ui.model2 === i ? 'on' : '') + '"><img alt="" src="' + arrThumb(i) + '"><b>' + arrNiceName(i) + '</b><small>Cat. ' + arrClass(i, ui.dist) + '</small></button>').join('') + '</div>';
+      h += '<h3>Câmbio dos dois</h3><div class="arrSeg"><button type="button" data-trans="manual" class="' + (ui.trans !== 'auto' ? 'on' : '') + '">Manual</button><button type="button" data-trans="auto" class="' + (ui.trans === 'auto' ? 'on' : '') + '">Automático</button></div>';
+      let pads = 0; try { pads = [...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(g => g && g.connected).length } catch (e) { }
+      h += '<h3>Comandos</h3><div class="arrIns pvpKeys"><p><b style="color:#d6ff60">J1 · tela da direita</b><br>Setas: <kbd>↑</kbd> acelera · <kbd>↓</kbd> freia · <kbd>Shift</kbd> direito sobe marcha · <kbd>Ctrl</kbd> direito reduz<br>ou o <b>controle 1</b>: RT acelera · LT freia · RB/LB marchas</p>' +
+        '<p><b style="color:#7cc8ff">J2 · tela da esquerda</b><br><kbd>W</kbd> acelera · <kbd>S</kbd> freia · <kbd>E</kbd> sobe marcha · <kbd>Q</kbd> reduz<br>ou o <b>controle 2</b>: RT acelera · LT freia · RB/LB marchas</p>' +
+        '<p class="arrSmall">Controles conectados: ' + pads + '. A/✕ ou Enter dá o PRONTO · C ou B troca a câmera (a câmera TV mostra os dois na mesma imagem) · Esc sai.</p>' +
+        '<p class="arrSmall">Vale só pela diversão: os carros não sofrem desgaste e ninguém ganha nem perde créditos. As peças de cada carro da garagem valem na pista.</p></div>';
+      const block = touchDevice && !pads ? 'No celular, o 2 jogadores precisa de teclado ou de 2 controles conectados.' : '';
+      h += '<div class="arrCta">' + (block ? '<p class="arrNote">' + block + '</p>' : '') + '<button type="button" class="arrGo" data-act="go" ' + (block ? 'disabled' : '') + '>Ir para a pista · 2 jogadores</button></div>';
+      return h;
+    }
     function arrRaceTab(d, ui, m, owned) {
       let h = '';
       const recov = arrNeedsRecovery();
       if (recov) h += '<div class="arrPend"><b>Sem carro utilizável</b><p>Você ficou sem carro em condição de correr (ou sem créditos para o reparo obrigatório). Faça a prova de recuperação com um Uno emprestado da oficina: vale só créditos (120 se vencer, 40 se concluir) para você retomar a carreira.</p><div class="arrBtns"><button type="button" class="arrGo" data-act="recovery">Prova de recuperação</button></div></div>';
       if (!owned.length) return h;
-      const kinds = [['time', '⏱ Contra o relógio', 'Sozinho, valendo recorde e metas'], ['duel', '⚔ Duelo por créditos', 'Inscrição e prêmio contra um rival'], ['key', '🔑 Corrida na Chave', 'Quem vence leva o carro do outro']];
+      const kinds = [['time', '⏱ Contra o relógio', 'Sozinho, valendo recorde e metas'], ['duel', '⚔ Duelo por créditos', 'Inscrição e prêmio contra um rival'], ['key', '🔑 Corrida na Chave', 'Quem vence leva o carro do outro'], ['pvp', '👥 2 jogadores', 'Na mesma tela, com teclado ou 2 controles']];
       const ks = arrKeyStatus(ui.dist, m);
       h += '<h3>Modo</h3><div class="arrKinds">' + kinds.map(([k, t, s]) => '<button type="button" data-kind="' + k + '" class="' + (ui.kind === k ? 'on' : '') + (k === 'key' && !ks.ok ? ' lock' : '') + '"><b>' + t + '</b><small>' + (k === 'key' && !ks.ok ? '🔒 ' + ks.why : s) + '</small></button>').join('') + '</div>';
       h += '<h3>Distância</h3><div class="arrSeg"><button type="button" data-dist="100" class="' + (ui.dist === 100 ? 'on' : '') + '">100 m</button><button type="button" data-dist="200" class="' + (ui.dist === 200 ? 'on' : '') + '">200 m <small>(parcial nos 100)</small></button></div>';
-      h += '<h3>Carro</h3>' + arrCarPicker(ui, owned, ui.dist);
+      h += '<h3>' + (ui.kind === 'pvp' ? 'Carro do J1 <small>(faixa da direita)</small>' : 'Carro') + '</h3>' + arrCarPicker(ui, owned, ui.dist);
       if (m == null) return h;
+      if (ui.kind === 'pvp') return h + arrPvpBlock(ui, owned);
       const ev = arrIsEV(m);
       h += '<h3>Câmbio</h3>' + (ev ? '<p class="arrNote">Elétrico · sem marchas: só largar e acelerar.</p>' : '<div class="arrSeg"><button type="button" data-trans="manual" class="' + (ui.trans !== 'auto' ? 'on' : '') + '">Manual <small>(mais rápido)</small></button><button type="button" data-trans="auto" class="' + (ui.trans === 'auto' ? 'on' : '') + '">Automático <small>(troca mais lenta)</small></button></div>');
       // Inscrição
@@ -9521,6 +9541,7 @@
       if (b.dataset.tab) { arrTab = b.dataset.tab; if (arrTab !== 'shop') arrFromInscricao = false; arrRenderHub(); return }
       if (b.dataset.kind) { ui.kind = b.dataset.kind; arrRivalPreview = null; arrSaveAll(); arrRenderHub(); return }
       if (b.dataset.dist) { ui.dist = Number(b.dataset.dist); arrRivalPreview = null; arrSaveAll(); arrRenderHub(); return }
+      if (b.dataset.car2) { ui.model2 = Number(b.dataset.car2); arrSaveAll(); arrRenderHub(); return }
       if (b.dataset.car) { ui.model = Number(b.dataset.car); arrRivalPreview = null; arrSaveAll(); arrRenderHub(); return }
       if (b.dataset.trans) { ui.trans = b.dataset.trans; arrSaveAll(); arrRenderHub(); return }
       if (b.dataset.fix) { arrRepair(ui.model, [b.dataset.fix]); return }
@@ -9558,7 +9579,9 @@
     }
     function arrGo() {
       const d = arrData(), ui = d.ui, m = ui.model;
-      if (m == null || !carOwned(m) || arrCriticalParts(m).length) return;
+      if (m == null || !carOwned(m)) return;
+      if (ui.kind === 'pvp') { arrStartRace({ kind: 'pvp', dist: ui.dist, model: m, model2: carOwned(ui.model2) ? ui.model2 : m, trans: ui.trans }); return }
+      if (arrCriticalParts(m).length) return;
       if (ui.kind === 'key') { if (!arrKeyStatus(ui.dist, m).ok || !arrRivalPreview?.rival) return; arrShowKeyConfirm(); return }
       if (ui.kind === 'duel') { if (!arrRivalPreview?.rival) return; const fee = ARR_CFG.fee[ui.dist][arrClass(m, ui.dist)]; if (career.credits < fee) return }
       arrStartRace({ kind: ui.kind, dist: ui.dist, model: m, rival: ui.kind === 'duel' ? arrRivalPreview.rival : null, trans: ui.trans });
@@ -9595,30 +9618,40 @@
     // ---------- Início da prova ----------
     const ARR_HIDE = ['menu', 'hud', 'routeHUD', 'bonusPanel', 'touch', 'careerPanel', 'environment', 'vehicleProfile', 'garage', 'office', 'garageShowcase', 'customizer', 'mobileSignals', 'signals', 'backPause'];
     let arrHidden = [];
+    function arrLaunchWin(pc, cond) {
+      if (pc.ev) return [0, 0];
+      const res = [];
+      for (let r = .2; r <= 1.001; r += .05) {
+        const s = arrRun(pc, { noFail: true, cond }); s.rpm = r; arrDepart(s, 0, false); s.launchR = r; let t = 0;
+        while (s.z < 60 && t < 20) { if (s.shift <= 0 && !s.slip && s.rpm >= .985 && s.gear < pc.vg.length) arrShift(s, 1); arrStep(s, 1 / 120, true, false, () => .5); t += 1 / 120 }
+        res.push([r, t]);
+      }
+      const bestT = Math.min(...res.map(x => x[1])), ok = res.filter(x => x[1] <= bestT + .04).map(x => x[0]);
+      return [Math.min(...ok) - .025, Math.max(...ok) + .025];
+    }
     function arrStartRace(cfg) {
       arrEnsureDom();
       const d = arrData(), m = cfg.model;
-      const loaner = cfg.kind === 'rec' || !carOwned(m); // desafio com carro que ainda não é seu: carro de fábrica, sem desgaste na garagem
-      const parts = loaner ? arrDefaultParts() : arrParts(m), cond = loaner ? (cfg.kind === 'rec' ? { motor: 85, embreagem: 85, cambio: 85, pneus: 85 } : Object.fromEntries(arrPartKeys(arrIsEV(m)).map(k => [k, 100]))) : arrCond(m);
+      const pvp = cfg.kind === 'pvp';
+      const loaner = cfg.kind === 'rec' || pvp || !carOwned(m); // desafio com carro que ainda não é seu: carro de fábrica, sem desgaste na garagem
+      const parts = pvp ? (carOwned(m) ? arrParts(m) : arrDefaultParts()) : loaner ? arrDefaultParts() : arrParts(m), cond = loaner ? (cfg.kind === 'rec' ? { motor: 85, embreagem: 85, cambio: 85, pneus: 85 } : Object.fromEntries(arrPartKeys(arrIsEV(m)).map(k => [k, 100]))) : arrCond(m);
       const pc = arrBuild(m, parts, cond);
       const P = arrRun(pc, { cond, heat: loaner ? { a: .2, b: .15 } : arrHeat(m) });
       P.shiftTime = cfg.trans === 'auto' ? .32 : .2; P.auto = cfg.trans === 'auto' || pc.ev;
       const est = arrEstimate(m, parts, cond, cfg.dist);
       // faixa de giro ideal para a largada
-      let win = [0, 0];
-      if (!pc.ev) {
-        const res = [];
-        for (let r = .2; r <= 1.001; r += .05) {
-          const s = arrRun(pc, { noFail: true, cond }); s.rpm = r; arrDepart(s, 0, false); s.launchR = r; let t = 0;
-          while (s.z < 60 && t < 20) { if (s.shift <= 0 && !s.slip && s.rpm >= .985 && s.gear < pc.vg.length) arrShift(s, 1); arrStep(s, 1 / 120, true, false, () => .5); t += 1 / 120 }
-          res.push([r, t]);
-        }
-        const bestT = Math.min(...res.map(x => x[1])), ok = res.filter(x => x[1] <= bestT + .04).map(x => x[0]);
-        win = [Math.min(...ok) - .025, Math.max(...ok) + .025];
-      }
+      const win = arrLaunchWin(pc, cond);
       if (parts.launch && !pc.ev) P.twoStep = Math.min(.97, (win[0] + win[1]) / 2);
-      let A = null, rv = cfg.rival || null;
-      if (rv) {
+      let A = null, rv = cfg.rival || null, win2 = null;
+      if (pvp) {
+        const m2 = cfg.model2 ?? m, p2 = carOwned(m2) ? arrParts(m2) : arrDefaultParts(), c2 = Object.fromEntries(arrPartKeys(arrIsEV(m2)).map(k => [k, 100]));
+        rv = { m: m2, parts: p2, cond: c2, heat: { a: .2, b: .15 }, name: 'J2', style: 'jogador', diff: 1, human: true };
+        const ac = arrBuild(m2, p2, c2);
+        A = arrRun(ac, { cond: c2, heat: rv.heat }); A.shiftTime = cfg.trans === 'auto' ? .32 : .2; A.auto = cfg.trans === 'auto' || ac.ev; A.human = true;
+        A.inp = { lb: false, lg: false, br: -9 };
+        win2 = arrLaunchWin(ac, c2);
+        if (p2.launch && !ac.ev) A.twoStep = Math.min(.97, (win2[0] + win2[1]) / 2);
+      } else if (rv) {
         const ac = arrBuild(rv.m, rv.parts, rv.cond);
         A = arrRun(ac, { cond: rv.cond, heat: rv.heat }); A.shiftTime = .22; A.auto = true;
         const aest = arrEstimate(rv.m, rv.parts, rv.cond, cfg.dist);
@@ -9632,12 +9665,12 @@
       const id = cfg.id || ('d' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
       const fee = cfg.fee ?? (cfg.kind === 'duel' ? ARR_CFG.fee[cfg.dist][arrClassOf(est.et, cfg.dist)] : 0);
       R = { id, kind: cfg.kind, dist: cfg.dist, model: m, parts, rival: rv, P, A, phase: 'stage', t: 0, green: null, tree: null, fee, est, win, resume: !!cfg.resume,
-        trans: cfg.trans, loaner, chal: !!cfg.chal, smoke: [], msg: '', msgT: 0, done: false, lastGas: false, lastBrake: false, brakeRel: -9, hudAt: 0, endT: null, warnT: 0, shake: 0 };
+        trans: cfg.trans, loaner, chal: !!cfg.chal, pvp, model2: cfg.model2, win2, smoke: [], msg: '', msgT: 0, done: false, lastGas: false, lastBrake: false, brakeRel: -9, hudAt: 0, endT: null, warnT: 0, shake: 0 };
       // esconde o menu do jogo e mostra a pista da arrancada
       arrHidden = ARR_HIDE.filter(i => $(i) && !$(i).hidden); arrHidden.forEach(i => $(i).hidden = true);
       try { document.getElementById('quickStart')?.remove() } catch (e) { }
       $('arrHub').hidden = true; $('arrResult').hidden = true; arrHubOpen = false;
-      $('arrHud').hidden = false; $('arrTouch').hidden = !touchDevice; $('arrTouch').classList.toggle('ev', pc.ev); $('arrTouch').classList.toggle('auto', !!P.auto);
+      $('arrHud').hidden = false; $('arrTouch').hidden = !touchDevice || pvp; $('arrHud').classList.toggle('pvp', pvp); $('arrTouch').classList.toggle('ev', pc.ev); $('arrTouch').classList.toggle('auto', !!P.auto);
       arrIn.gas = arrIn.brake = false;
       mode = 'drag'; keys.clear(); document.body.classList.add('dragOn'); arrKeysLast = '';
       try { audio() } catch (e) { }
@@ -9647,10 +9680,16 @@
     }
     function arrStageUI() {
       const s = $('ahStage'); if (!R) return;
-      $('arrTouch').hidden = !touchDevice || R.phase === 'stage';
+      $('arrTouch').hidden = !touchDevice || R.phase === 'stage' || !!R.pvp;
       if (R.phase !== 'stage') { s.hidden = true; $('ahQuit').hidden = R.phase === 'end' || R.kind === 'time' && R.phase === 'end'; return }
       const k = R.kind, rv = R.rival;
       s.hidden = false; $('ahQuit').hidden = true;
+      if (R.pvp) {
+        s.innerHTML = '<b>👥 2 jogadores · ' + R.dist + ' m</b><p><span style="color:#7cc8ff">J2 ' + arrNiceName(R.model2) + '</span> × <span style="color:#d6ff60">J1 ' + arrNiceName(R.model) + '</span></p>' +
+          '<p class="arrSmall">Acelere no verde. Quem segura o freio e solta no verde sai mais forte. Largou antes do verde, queimou.' + (R.P.auto ? '' : ' Troque de marcha no TROQUE.') + '</p>' +
+          '<div class="arrBtns"><button type="button" id="ahCancel">Cancelar</button><button type="button" class="arrGo" id="ahReady">PRONTO · iniciar contagem</button></div>';
+        $('ahReady').onclick = () => arrBeginTree(); $('ahCancel').onclick = () => arrExit(true); return;
+      }
       s.innerHTML = '<b>' + (k === 'key' ? '🔑 Corrida na Chave' : k === 'duel' ? '⚔ Duelo por créditos' : k === 'rec' ? '🛟 Prova de recuperação' : '⏱ Contra o relógio') + ' · ' + R.dist + ' m</b>' +
         '<p>' + arrNiceName(R.model) + (R.loaner ? ' (emprestado)' : '') + (rv ? ' × ' + arrNiceName(rv.m) + ' · ' + rv.name : '') + '</p>' +
         '<p class="arrSmall">' + (R.P.c.ev ? 'Elétrico: toque ACELERAR no verde (ou segure FREIO + ACELERAR e solte o freio no verde).' : 'Simples: ACELERAR no verde. Profissional: segure FREIO, deixe o giro na faixa verde com ACELERAR e solte o FREIO no verde.' + (R.P.auto ? '' : ' Troque de marcha no TROQUE.')) + '</p>' +
@@ -9663,7 +9702,7 @@
       if (!R || R.phase !== 'stage') return;
       const d = arrData();
       // a partir daqui a prova vale: inscrição cobrada e pareamento salvo na mesma gravação
-      if (!R.resume) {
+      if (!R.resume && !R.pvp) {
         if (R.kind === 'duel') { if (career.credits < R.fee) { arrExit(true); return } career.credits -= R.fee }
         d.pending = { id: R.id, kind: R.kind, dist: R.dist, model: R.model, rival: R.rival, fee: R.fee, trans: R.trans, at: Date.now() };
         saveCareer();
@@ -9697,10 +9736,17 @@
       }
       const gasK = arrIn.gas || keys.has('ArrowUp') || keys.has('KeyW');
       const brakeK = arrIn.brake || keys.has('ArrowDown') || keys.has('KeyS') || keys.has('Space');
+      const PV = R.pvp ? arrPvpInputs() : null;
       const steps = Math.max(1, Math.round(dt * 240)), h = dt / steps;
       for (let i = 0; i < steps; i++) {
         R.t += h;
         const t = R.t, inRace = R.phase === 'tree' || R.phase === 'run' || R.phase === 'end';
+        if (PV) { // 2 jogadores: os dois carros com as mesmas regras de largada e física
+          arrHuman(P, h, t, inRace, PV.g1, PV.b1, R.pin1 || (R.pin1 = { lb: false, lg: false, br: -9 }));
+          arrHuman(A, h, t, inRace, PV.g2, PV.b2, A.inp);
+          if (R.phase === 'tree' && t >= R.green) { R.phase = 'run'; arrFlash('VERDE!', 0.7) }
+          continue;
+        }
         // jogador
         let gas = gasK, brake = brakeK;
         if (R.phase === 'stage') brake = true; // freio de linha até o PRONTO
@@ -9738,8 +9784,9 @@
         if (R.phase === 'tree' && t >= R.green) { R.phase = 'run'; arrFlash('VERDE!', 0.7) }
       }
       // queima de largada vista na hora
-      if (P.departed && R.green != null && P.rt == null) { P.rt = P.tDep - R.green; if (P.rt < 0) arrFlash('QUEIMOU A LARGADA!', 2.2) }
-      if (A && A.departed && R.green != null && A.rt == null) A.rt = A.tDep - R.green;
+      if (P.departed && R.green != null && P.rt == null) { P.rt = P.tDep - R.green; if (P.rt < 0) arrFlash(R.pvp ? 'J1 QUEIMOU!' : 'QUEIMOU A LARGADA!', 2.2) }
+      if (A && A.departed && R.green != null && A.rt == null) { A.rt = A.tDep - R.green; if (R.pvp && A.rt < 0) arrFlash('J2 QUEIMOU!', 2.2) }
+      if (R.pvp && R.phase === 'run' && R.t - R.green > 12) for (const s of [P, A]) if (!s.departed) s.dns = true;
       if (P.departed && P.tDep < (R.green ?? Infinity) && R.phase === 'tree') { /* o carro saiu antes do verde: o semáforo segue até o verde para medir */ }
       if (P.failLight && !P.failShown) { P.failShown = true; arrFlash('⚠ ' + P.failLight.fx, 2) }
       if (P.dead && !P.deadShown) { P.deadShown = true; arrFlash('💥 ' + arrPartLabel(P.fail.part, R.model) + ' quebrou!', 2.6) }
@@ -9753,14 +9800,51 @@
       rpm = P.rpm; v = P.v;
       if (performance.now() - R.hudAt > 60) arrHudUpdate();
       // não largou
-      if (R.phase === 'run' && !P.departed && R.t - R.green > 12) { arrFinish('noStart'); return }
+      if (!R.pvp && R.phase === 'run' && !P.departed && R.t - R.green > 12) { arrFinish('noStart'); return }
       // fim da prova
-      const pDone = P.zFin != null || P.dead || (P.departed && P.v < .3 && R.t - P.tDep > 3);
-      const aDone = !A || A.zFin != null || A.dead || (A.departed && A.v < .3 && R.t - A.tDep > 3);
+      const pDone = P.zFin != null || P.dead || P.dns || (P.departed && P.v < .3 && R.t - P.tDep > 3);
+      const aDone = !A || A.zFin != null || A.dead || A.dns || (A.departed && A.v < .3 && R.t - A.tDep > 3);
       if (pDone && aDone && R.phase !== 'end') { R.phase = 'end'; R.endT = R.t }
       if (R.phase === 'end' && (R.t - R.endT > 2.2 || (P.v < 2 && (!A || A.v < 2)))) { arrFinish(); return }
       if (R.green != null && R.t - R.green > 40) { arrFinish(); return }
     }
+    function arrHuman(s, h, t, inRace, gasK, brakeK, st) {
+      let gas = gasK, brake = brakeK;
+      if (R.phase === 'stage') brake = true; // freio de linha até o PRONTO
+      if (!s.departed && inRace && !s.dns) {
+        if (st.lb && !brakeK) st.br = t;
+        if (!brakeK && gasK) { const pro = t - st.br < .25 && st.lg; arrDepart(s, t, !pro && !s.c.ev); if (!pro && !s.c.ev) s.launchR = .38 }
+      }
+      st.lb = brakeK; st.lg = gasK;
+      if (s.departed && !s.c.ev && s.auto && s.shift <= 0 && !s.slip && s.rpm >= .975 && s.gear < s.c.vg.length && !s.dead) arrShift(s, 1);
+      if (s.zFin != null) { gas = false; if (t - s.tFin > .6) s.autoBrake = true }
+      if (s.dead || s.dns) gas = false;
+      if (!s.departed) arrStep(s, h, gas && (brake || R.phase !== 'stage') && R.phase !== 'end', true);
+      else arrStep(s, h, gas, brake && s.departed);
+      arrMarks(s, t);
+    }
+    // Entradas dos 2 jogadores: J1 = setas + controle 1 · J2 = W/S/E/Q + controle 2
+    function arrPvpInputs() {
+      const out = { g1: keys.has('ArrowUp') || arrIn.gas, b1: keys.has('ArrowDown') || arrIn.brake, g2: keys.has('KeyW'), b2: keys.has('KeyS') };
+      let gps = []; try { gps = [...(navigator.getGamepads ? navigator.getGamepads() : [])].filter(g => g && g.connected) } catch (e) { }
+      R.padsN = gps.length; R.pp = R.pp || [[], []];
+      gps.slice(0, 2).forEach((gp, i) => {
+        const b = k => gp.buttons[k] ? (gp.buttons[k].value || (gp.buttons[k].pressed ? 1 : 0)) : 0, prev = R.pp[i], edge = k => b(k) > .5 && !prev[k];
+        let rt = b(7), lt = b(6); const ay = gp.axes[1] || 0;
+        const gas = rt > .1 || ay < -.6, brk = lt > .1 || ay > .6;
+        const S = i === 0 ? P0() : R.A;
+        if (i === 0) { out.g1 = out.g1 || gas; out.b1 = out.b1 || brk } else { out.g2 = out.g2 || gas; out.b2 = out.b2 || brk }
+        if (edge(5)) arrShift(S, 1); if (edge(4)) arrShift(S, -1);
+        if (edge(0) && R.phase === 'stage') arrBeginTree();
+        if (edge(1)) arrCycleCam();
+        if (edge(9)) arrAskQuit();
+        R.pp[i] = gp.buttons.map(x => !!x && (x.value || (x.pressed ? 1 : 0)) > .5);
+      });
+      const a2 = ARR_DEBUG.auto2; // piloto automático do J2 (testes)
+      if (a2 && R.green != null) { const go = R.t >= R.green + (a2.rt ?? .2); if (a2.launch === 'simple') { out.b2 = false; out.g2 = go } else { out.b2 = !go; out.g2 = R.t >= R.green - 1.2 || go } if (R.A.zFin != null) out.g2 = false; if (R.A.departed && R.A.rpm > .975 && R.A.shift <= 0 && !R.A.slip) arrShift(R.A, 1) }
+      return out;
+    }
+    const P0 = () => R.P;
     function arrMarks(s, t) {
       const R0 = R;
       if (s.z100 == null && s.z >= 100 && s.departed) { s.z100 = 100; s.t100 = t - (s.z - 100) / Math.max(.1, s.v) }
@@ -9773,7 +9857,13 @@
       const el = $('ahKeys'); if (!el || !R) return;
       const usePad = typeof pad !== 'undefined' && pad.active, manual = !R.P.auto && !R.P.c.ev, stage = R.phase === 'stage';
       let h = '';
-      if (usePad) h = '<b>🎮</b><span><kbd>RT</kbd> acelera</span><span><kbd>LT</kbd> freia</span>' + (manual ? '<span><kbd>RB</kbd> sobe marcha</span><span><kbd>LB</kbd> reduz</span>' : '') + (stage ? '<span><kbd>A</kbd> pronto</span>' : '') + '<span><kbd>B</kbd> câmera</span><span><kbd>Start</kbd> desistir</span>';
+      if (R.pvp) {
+        const n = R.padsN || 0;
+        h = '<span class="pv1"><b>J1 →</b> ' + (n >= 1 ? '🎮 controle 1' : '<kbd>↑</kbd> acelera <kbd>↓</kbd> freia' + (manual ? ' <kbd>Shift</kbd> dir. sobe <kbd>Ctrl</kbd> dir. reduz' : '')) + '</span>' +
+          '<span class="pv2"><b>← J2</b> ' + (n >= 2 ? '🎮 controle 2' : '<kbd>W</kbd> acelera <kbd>S</kbd> freia' + (manual ? ' <kbd>E</kbd> sobe <kbd>Q</kbd> reduz' : '')) + '</span>' +
+          (stage ? '<span><kbd>Enter</kbd>/<kbd>A</kbd> pronto</span>' : '') + '<span><kbd>C</kbd> câmera</span><span><kbd>Esc</kbd> sair</span>';
+      }
+      else if (usePad) h = '<b>🎮</b><span><kbd>RT</kbd> acelera</span><span><kbd>LT</kbd> freia</span>' + (manual ? '<span><kbd>RB</kbd> sobe marcha</span><span><kbd>LB</kbd> reduz</span>' : '') + (stage ? '<span><kbd>A</kbd> pronto</span>' : '') + '<span><kbd>B</kbd> câmera</span><span><kbd>Start</kbd> desistir</span>';
       else if (!touchDevice) h = '<b>⌨</b><span><kbd>↑</kbd>/<kbd>W</kbd> acelera</span><span><kbd>↓</kbd>/<kbd>S</kbd> freia</span>' + (manual ? '<span><kbd>Shift</kbd>/<kbd>E</kbd> sobe marcha</span><span><kbd>Ctrl</kbd>/<kbd>Q</kbd> reduz</span>' : '') + (stage ? '<span><kbd>Enter</kbd> pronto</span>' : '') + '<span><kbd>C</kbd> câmera</span><span><kbd>Esc</kbd> desistir</span>';
       if (h !== arrKeysLast) { el.innerHTML = h; el.hidden = !h; arrKeysLast = h }
       const sh = $('ahShift'); if (sh) sh.textContent = usePad ? 'TROQUE · RB' : touchDevice ? 'TROQUE' : 'TROQUE · Shift';
@@ -9815,7 +9905,7 @@
     }
     function arrAskQuit() {
       if (!R) return;
-      if (R.phase === 'stage') { arrExit(true); return }
+      if (R.phase === 'stage' || R.pvp) { arrExit(true); return } // 2 jogadores: sair não tem penalidade
       const k = R.kind;
       if (k === 'time' || k === 'rec') { arrFinish('quit'); return }
       if (R.askQuit && performance.now() - R.askQuit < 3000) { arrFinish('quit'); return }
@@ -9824,7 +9914,7 @@
     // Interrupção técnica (aba escondida, app fechado): a prova não vale e o mesmo pareamento fica para nova tentativa
     function arrInterrupt() {
       if (!R || mode !== 'drag') return;
-      if (R.phase === 'stage') { arrExit(true); return }
+      if (R.phase === 'stage' || R.pvp) { arrExit(true); return }
       if (R.phase === 'end' || R.done) { arrFinish(); return }
       R.done = true; R = null; arrLeave(); openArrancada('race');
     }
@@ -9851,7 +9941,7 @@
       const { outcome, reason } = arrOutcome(R.kind, why, pr, ar);
       const res = { id: R.id, chal: R.chal, kind: R.kind, dist: R.dist, model: R.model, rival: R.rival, fee: R.fee, outcome, reason, player: pr, ai: ar, wearP: pw,
         condP: P.cond, heatP: P.heat, condA: A ? A.cond : null, heatA: A ? A.heat : null, est: R.est.et, loaner: R.loaner, broken: P.broken, brokenA: A?.broken };
-      arrApply(res);
+      if (R.pvp) { res.pvp = true; res.model2 = R.model2; res.trans = R.trans } else arrApply(res);
       const keep = R; R = null; arrLeave();
       arrShowResult(res, keep);
     }
@@ -9939,7 +10029,29 @@
       try { missionEvent('drag', res) } catch (e) { }
       return res;
     }
+    const arrPvpScore = { j1: 0, j2: 0 };
+    function arrShowPvpResult(res) {
+      arrLastResult = res;
+      const box = $('arrResult'), j1 = res.player, j2 = res.ai;
+      if (res.outcome === 'win') arrPvpScore.j1++; else if (res.outcome === 'lose') arrPvpScore.j2++;
+      const big = res.outcome === 'win' ? 'J1 VENCEU!' : res.outcome === 'lose' ? 'J2 VENCEU!' : 'EMPATE';
+      const col = res.outcome === 'win' ? '#d6ff60' : res.outcome === 'lose' ? '#7cc8ff' : '#ffd23f';
+      const why = String(res.reason || '').replace(/^Você queimou/, 'J1 queimou').replace(/^O rival queimou/, 'J2 queimou').replace('e você saiu primeiro', 'e o J1 saiu primeiro').replace('e o rival saiu primeiro', 'e o J2 saiu primeiro')
+        .replace(/^Você cruzou primeiro/, 'J1 cruzou primeiro').replace(/^O rival cruzou primeiro/, 'J2 cruzou primeiro').replace(/^O carro do rival quebrou e você concluiu/, 'O carro do J2 quebrou e o J1 concluiu').replace(/^Seu carro quebrou e o rival concluiu/, 'O carro do J1 quebrou e o J2 concluiu').replace(/^O rival não concluiu/, 'O J2 não concluiu').replace(/^Você não concluiu/, 'O J1 não concluiu');
+      const row = (label, f) => '<tr><td>' + label + '</td><td>' + f(j1) + '</td><td>' + f(j2) + '</td></tr>';
+      box.innerHTML = '<div class="arCard"><small>2 jogadores · ' + res.dist + ' m · sem créditos e sem desgaste</small><h2 style="color:' + col + '">' + big + '</h2><p>' + why + '</p>' +
+        '<table><tr><th></th><th>J1 · ' + arrNiceName(res.model) + '</th><th>J2 · ' + arrNiceName(res.model2) + '</th></tr>' +
+        row('Reação', x => x?.rt != null ? arrFmt(x.rt) + ' s' + (x.foul ? ' 🔴' : '') : '—') +
+        (res.dist === 200 ? row('Parcial 100 m', x => x?.t100 != null ? arrFmt(x.t100) + ' s' : '—') : '') +
+        row('Tempo de percurso', x => x?.et != null ? arrFmt(x.et) + ' s' : x?.dead ? 'quebrou' : '—') +
+        row('Total (reação + percurso)', x => x?.et != null && x.rt != null ? arrFmt(x.rt + x.et) + ' s' : '—') +
+        row('Velocidade na chegada', x => x?.trap != null ? Math.round(x.trap) + ' km/h' : '—') + '</table>' +
+        '<div class="arMoney"><b>Placar da sessão: J1 ' + arrPvpScore.j1 + ' × ' + arrPvpScore.j2 + ' J2</b><small>Os carros não sofrem desgaste e ninguém ganha nem perde créditos.</small></div>' +
+        '<div class="arrBtns"><button type="button" class="arrGo" data-r="again">Revanche</button><button type="button" data-r="hub">Arrancada</button><button type="button" data-r="menu">Menu do jogo</button></div></div>';
+      box.hidden = false;
+    }
     function arrShowResult(res, run) {
+      if (res.pvp) return arrShowPvpResult(res);
       arrLastResult = res;
       const box = $('arrResult'), pr = res.player, ar = res.ai;
       const big = { win: 'VITÓRIA', lose: 'DERROTA', tie: 'EMPATE', done: 'PROVA CONCLUÍDA', foul: 'QUEIMOU A LARGADA', dnf: 'NÃO CONCLUIU', none: 'PROVA ENCERRADA' }[res.outcome];
@@ -9970,6 +10082,7 @@
     function arrResultClick(e) {
       const b = e.target.closest('button'); if (!b) return;
       const r = b.dataset.r, res = arrLastResult; $('arrResult').hidden = true;
+      if (r === 'again' && res && res.pvp) { arrStartRace({ kind: 'pvp', dist: res.dist, model: res.model, model2: res.model2, trans: res.trans }); return }
       if (r === 'again' && res) {
         if (res.kind === 'rec') { if (arrNeedsRecovery()) arrStartRecovery(); else openArrancada('race'); return }
         const d = arrData(); d.ui.kind = res.kind; d.ui.dist = res.dist; d.ui.model = res.model;
@@ -10010,7 +10123,7 @@
       try { arrTex.palms = [1, 2, 3, 4].map(s => tree(700 + s * 17, true)); arrTex.trees = [5, 6].map(s => tree(900 + s * 13, false)) } catch (e) { arrTex.palms = []; arrTex.trees = [] }
     }
     function arrBackground(g, W, H, yH) {
-      const sc = canvas.width / Math.max(1, W);
+      const sc = canvas.width / Math.max(1, w);
       if (!arrTex.bg || arrTex.bgW !== W || arrTex.bgH !== H || arrTex.bgY !== yH) {
         const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(W * sc)); c.height = Math.max(1, Math.round((yH + 2) * sc));
         const b = c.getContext('2d'); b.scale(sc, sc);
@@ -10065,27 +10178,74 @@
     function arrCamIdx() { try { return (career.drag?.ui?.cam | 0) % ARR_CAMS.length } catch (e) { return 0 } }
     function arrCycleCam() { const d = arrData(); d.ui.cam = (arrCamIdx() + 1) % ARR_CAMS.length; try { localStorage.setItem(careerKey, JSON.stringify(career)) } catch (e) { } if (R) arrFlash('Câmera: ' + ARR_CAMS[d.ui.cam].name, 1.1); const b = document.getElementById('ahCam'); if (b) b.textContent = '🎥 ' + ARR_CAMS[d.ui.cam].name }
     // Cockpit: reaproveita o painel de cada carro do jogo, com velocidade, giro e marcha da arrancada
-    function arrCockpit() {
+    function arrCockpit(S, m, W, H) {
+      S = S || R.P; m = m ?? R.model;
       const sv = [model, v, rpm, march, wheelAngle, bodyRoll, elapsed, z, night, raining];
       try {
-        model = R.model; v = R.P.v; rpm = Math.min(1, R.P.rpm); march = R.P.c.ev ? 1 : R.P.departed ? R.P.gear : 0;
+        model = m; v = S.v; rpm = Math.min(1, S.rpm); march = S.c.ev ? 1 : S.departed ? S.gear : 0;
         wheelAngle = 0; bodyRoll = 0; elapsed = R.t; z = 0; night = false; raining = false;
-        ctx.save(); drawCockpit(cars[R.model]); ctx.restore();
+        ctx.save(); drawCockpit(cars[m], ctx, W || w, H || h); ctx.restore();
       } catch (e) { } finally { [model, v, rpm, march, wheelAngle, bodyRoll, elapsed, z, night, raining] = sv }
+    }
+    function arrPvpHud(W, H, s, side) {
+      const g = ctx, me = side > 0 ? 'J1' : 'J2', m = side > 0 ? R.model : R.rival.m;
+      const k = Math.min(1, W / 316); W /= k; H /= k;
+      const bw = Math.min(W - 16, 300), bx = (W - bw) / 2, by = Math.max(8, H * .015), bh = 96;
+      g.save(); g.scale(k, k); g.fillStyle = 'rgba(11,15,13,.82)'; g.beginPath(); g.roundRect ? g.roundRect(bx, by, bw, bh, 14) : g.rect(bx, by, bw, bh); g.fill();
+      g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+      g.fillStyle = side > 0 ? '#d6ff60' : '#7cc8ff'; g.font = '800 13px system-ui, sans-serif'; g.fillText(me + ' · ' + (typeof arrNiceName === 'function' ? arrNiceName(m) : ''), bx + 12, by + 19, bw - 24);
+      const tt = s.departed ? Math.max(0, (s.tFin ?? R.t) - s.tDep) : 0;
+      g.fillStyle = '#ffffff'; g.font = '800 26px ui-monospace, SFMono-Regular, Menlo, monospace'; g.fillText(tt.toFixed(3).replace('.', ','), bx + 12, by + 48);
+      g.textAlign = 'right'; g.font = '800 22px ui-monospace, monospace'; g.fillStyle = '#ffd23f';
+      g.fillText((s.c.ev ? 'E' : s.departed ? (s.shift > 0 ? '·' : s.gear) : 'N') + '  ' + Math.round(s.v * 3.6) + ' km/h', bx + bw - 12, by + 48);
+      const r = Math.max(0, Math.min(1.05, s.rpm)), rw = bw - 24, win = side > 0 ? R.win : R.win2;
+      g.fillStyle = 'rgba(255,255,255,.14)'; g.fillRect(bx + 12, by + 58, rw, 9);
+      if (!s.departed && !s.c.ev && win) { g.fillStyle = 'rgba(56,255,106,.35)'; g.fillRect(bx + 12 + rw * win[0] / 1.05, by + 58, rw * (win[1] - win[0]) / 1.05, 9) }
+      g.fillStyle = r > .97 ? '#ff4b3a' : r > .9 ? '#ffd23f' : '#d6ff60'; g.fillRect(bx + 12, by + 58, rw * r / 1.05, 9);
+      g.textAlign = 'left'; g.font = '700 12px system-ui, sans-serif';
+      let st = s.rt != null ? 'reação ' + s.rt.toFixed(3).replace('.', ',') : 'reação —', col = '#dfe7d6';
+      if (s.rt != null && s.rt < 0) { st = 'QUEIMOU A LARGADA'; col = '#ff6b5a' }
+      if (s.dead) { st = 'QUEBROU'; col = '#ff6b5a' } else if (s.zFin != null) { st += ' · chegou'; col = '#8fe36a' } else if (s.dns) { st = 'não largou'; col = '#ff6b5a' }
+      g.fillStyle = col; g.fillText(st, bx + 12, by + 85, bw - 90);
+      g.textAlign = 'right'; g.fillStyle = '#dfe7d6'; g.fillText(Math.min(R.dist, Math.max(0, Math.floor(s.z))) + ' / ' + R.dist + ' m', bx + bw - 12, by + 85);
+      if (!s.c.ev && !s.auto && s.departed && s.zFin == null && !s.dead && s.rpm > .92 && s.gear < s.c.vg.length && (R.t * 8 | 0) % 2 === 0) {
+        g.textAlign = 'center'; g.fillStyle = '#ff2b19'; g.beginPath(); g.roundRect ? g.roundRect(W / 2 - 62, by + bh + 6, 124, 26, 8) : g.rect(W / 2 - 62, by + bh + 6, 124, 26); g.fill();
+        g.fillStyle = '#fff'; g.font = '900 13px system-ui, sans-serif'; g.fillText('TROQUE · ' + ((R.padsN || 0) > (side > 0 ? 0 : 1) ? 'RB' : side > 0 ? 'Shift dir.' : 'E'), W / 2, by + bh + 24);
+      }
+      g.restore();
     }
     function arrDraw() {
       arrMakeTextures();
-      const g = ctx, W = w, H = h;
-      if (!R) { g.fillStyle = '#0b1210'; g.fillRect(0, 0, W, H); return }
+      if (!R) { ctx.fillStyle = '#0b1210'; ctx.fillRect(0, 0, w, h); return }
+      const CAM0 = ARR_CAMS[arrCamIdx()] || ARR_CAMS[0];
+      if (R.pvp && CAM0.cx !== 0) {
+        // 2 jogadores: tela dividida, jogador 2 (faixa da esquerda) à esquerda e jogador 1 à direita
+        const half = Math.floor(w / 2);
+        for (const [x0, F, side] of [[0, R.A, -1], [w - half, R.P, 1]]) {
+          ctx.save(); ctx.beginPath(); ctx.rect(x0, 0, half, h); ctx.clip(); ctx.translate(x0, 0);
+          try { arrDrawView(half, h, F, side) } catch (e) { console.error(e) }
+          try { arrPvpHud(half, h, F, side) } catch (e) { }
+          ctx.restore();
+        }
+        ctx.fillStyle = '#0b0f0d'; ctx.fillRect(half - 2, 0, 4 + (w - 2 * half), h);
+        return;
+      }
+      arrDrawView(w, h, R.P, 1);
+      if (R.pvp) { const half = w / 2; try { arrPvpHud(half, h, R.A, -1); ctx.save(); ctx.translate(half, 0); arrPvpHud(half, h, R.P, 1); ctx.restore() } catch (e) { } }
+    }
+    function arrDrawView(W, H, F, side) {
+      const g = ctx;
       const P = R.P, A = R.A, L = ARR_CFG.lane;
+      const O = F === P ? A : P, fModel = F === P ? R.model : R.rival.m, oModel = O === P ? R.model : R.rival?.m;
       const sh = R.shake * (Math.random() - .5);
       // câmera exatamente atrás do seu carro (alinhada com a faixa), com o centro óptico deslocado
       // para a direita: o carro anda reto na faixa e o rival continua visível na faixa ao lado
       const CAM = ARR_CAMS[arrCamIdx()] || ARR_CAMS[0];
       const camF = W < H && CAM.fP ? CAM.fP : CAM.f, camBack = W < H && CAM.backP != null ? CAM.backP : CAM.back;
-      const f = Math.min(W * 1.02, H * 1.55) * (1 - Math.min(.1, P.v * .002)) * camF, yH = H * CAM.yH;
+      const f = Math.min(W * 1.02, H * 1.55) * (1 - Math.min(.1, F.v * .002)) * camF, yH = H * CAM.yH;
       const back = Math.max(7, Math.min(9.5, f / camF / (.135 * W))) * camF + camBack;
-      const cz = CAM.cockpit ? P.z - 2.35 : P.z - 3.6 - back - Math.min(2.6, P.v * .06), cx = CAM.cockpit ? L - .37 : L * CAM.cx, cy = CAM.cy + sh * (CAM.cockpit ? .02 : .05), ox = W * (CAM.cx === 0 || CAM.cockpit ? .5 : W < H ? CAM.oxP : CAM.ox);
+      const oxv = W < H ? CAM.oxP : CAM.ox;
+      const cz = CAM.cockpit ? F.z - 2.35 : F.z - 3.6 - back - Math.min(2.6, F.v * .06), cx = CAM.cockpit ? side * L - .37 : side * L * CAM.cx, cy = CAM.cy + sh * (CAM.cockpit ? .02 : .05), ox = W * (CAM.cx === 0 || CAM.cockpit ? .5 : side > 0 ? oxv : 1 - oxv);
       const pr = (x, y, z) => { const dz = z - cz; if (dz < .3) return null; const k = f / dz; return [ox + (x - cx) * k + sh * 2, yH + (cy - y) * k, k] };
       const zN = cz + .45, zF = Math.min(cz + 520, 430);
       arrBackground(g, W, H, yH);
@@ -10214,7 +10374,7 @@
           g.fillText(s ? arrFmt(tt) + '  ' + Math.round((s.tFin != null ? s.vFin : s.v) * 3.6) + ' km/h' : '—', a[0] + wdt - k * .5, y);
         };
         line(a[1] + k * 2.5, A ? (R.rival?.name || 'RIVAL').split(' ')[0].toUpperCase() : '—', A);
-        line(a[1] + k * 4.3, 'VOCÊ', P);
+        line(a[1] + k * 4.3, R.pvp ? 'J1' : 'VOCÊ', P);
       }]);
       // árvore de largada (semáforo)
       const tz = 1.6;
@@ -10301,13 +10461,13 @@
           if (s.dead && (s.t * 6 | 0) % 2 === 0) { g.fillStyle = 'rgba(80,80,80,.5)'; g.beginPath(); g.arc(b[0], b[1] - ph * 1.1, ph * .5, 0, 7); g.fill() }
         }]);
       };
-      if (A) car(A, R.rival.m, -L, false);
-      if (!CAM.cockpit) car(P, R.model, L, true);
+      if (O) car(O, oModel, (O === P ? 1 : -1) * L, false);
+      if (!CAM.cockpit) car(F, fModel, side * L, true);
       items.sort((a, b) => b[0] - a[0]);
       for (const it of items) { try { it[1]() } catch (e) { } }
-      if (CAM.cockpit) arrCockpit();
+      if (CAM.cockpit) arrCockpit(F, fModel, W, H);
       // vinheta de velocidade
-      if (P.v > 18) { const a = Math.min(.35, (P.v - 18) / 80); const gr = g.createRadialGradient(W / 2, H * .5, H * .3, W / 2, H * .5, H * .95); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,' + a + ')'); g.fillStyle = gr; g.fillRect(0, 0, W, H) }
+      if (F.v > 18) { const a = Math.min(.35, (F.v - 18) / 80); const gr = g.createRadialGradient(W / 2, H * .5, H * .3, W / 2, H * .5, H * .95); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,' + a + ')'); g.fillStyle = gr; g.fillRect(0, 0, W, H) }
     }
     // ---------- Arrancada: integração com o jogo ----------
     addEventListener('keydown', e => {
@@ -10315,6 +10475,10 @@
       const c = e.code;
       if (['ArrowUp', 'ArrowDown', 'KeyW', 'KeyS', 'Space', 'ArrowLeft', 'ArrowRight'].includes(c)) { e.preventDefault(); keys.add(c) }
       if (e.repeat) return;
+      if (R && R.pvp) {
+        const sh = { ShiftRight: [R.P, 1], Slash: [R.P, 1], ControlRight: [R.P, -1], Period: [R.P, -1], KeyE: [R.A, 1], ShiftLeft: [R.A, 1], KeyQ: [R.A, -1], ControlLeft: [R.A, -1] }[c];
+        if (sh) { e.preventDefault(); if (R.phase === 'run' && !sh[0].auto && !sh[0].c.ev) arrShift(sh[0], sh[1]); return }
+      }
       if (c === 'ShiftLeft' || c === 'ShiftRight' || c === 'KeyE' || c === 'KeyM') { e.preventDefault(); arrShiftCmd(1) }
       if (c === 'ControlLeft' || c === 'KeyQ' || c === 'KeyN' || c === 'KeyZ') { e.preventDefault(); arrShiftCmd(-1) }
       if (c === 'Enter' && R && R.phase === 'stage') arrBeginTree();
@@ -10414,6 +10578,7 @@
       let rt = b(7), lt = b(6);
       if (!rt && gp.axes.length >= 6 && gp.axes[5] > -.95 && gp.axes[5] !== 0) rt = (gp.axes[5] + 1) / 2;
       if (!lt && gp.axes.length >= 5 && gp.axes[4] > -.95 && gp.axes[4] !== 0) lt = (gp.axes[4] + 1) / 2;
+      if (mode === 'drag' && typeof R !== 'undefined' && R && R.pvp) { arrIn.gas = arrIn.brake = false; pad.prev = gp.buttons.map(x => x ? x.value || (x.pressed ? 1 : 0) : 0); return }
       const driving = mode === 'race' || mode === 'drag';
       if (driving) {
         pad.gas = rt > .06 ? rt : 0;
