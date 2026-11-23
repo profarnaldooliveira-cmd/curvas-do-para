@@ -4598,6 +4598,7 @@
       ctx.setTransform(canvas.width / w, 0, 0, canvas.height / h, 0, 0);
       ctx.globalCompositeOperation = 'source-over';
       ctx.drawImage(gradeLayer, 0, 0, w, h);
+      if (nightCinema() && !touchDevice) filmGrain();
       const speed = mode === 'race' ? Math.max(clamp((v - 30) / 18, 0, 1), nitroOn ? 1 : 0) : 0;
       if (speed > 0) {
         const cx = w / 2, cy = h * .42, t = elapsed * 9;
@@ -4663,6 +4664,30 @@
             }
             prev = p;
           }
+        }
+      }
+      // Postes de energia com fios (rodovias e serra)
+      if ((kind === 1 || kind === 5 || kind === 7) && !lite) {
+        const step = 36, l = edge + 5.2, wood = tone(92, 84, 74), cable = night ? 'rgba(18,20,22,.75)' : 'rgba(34,36,38,.7)';
+        let prev = null;
+        for (let s = Math.floor((origin + reach) / step) * step; s > origin - step; s -= step) {
+          if (bridgeAt(s)) { prev = null; continue }
+          const b = project(s, l), tp = project(s, l, 8.2);
+          const vis = s > origin + 3 && b[2] >= .2 && b[0] > -60 && b[0] < w + 60;
+          if (vis) {
+            ctx.fillStyle = wood; ctx.fillRect(b[0] - b[2] * .11, tp[1], Math.max(.7, b[2] * .22), b[1] - tp[1]);
+            const c0 = project(s, l - .9, 7.6), c1 = project(s, l + .9, 7.6);
+            ctx.strokeStyle = wood; ctx.lineWidth = Math.max(.6, b[2] * .1); ctx.beginPath(); ctx.moveTo(c0[0], c0[1]); ctx.lineTo(c1[0], c1[1]); ctx.stroke();
+          }
+          if (prev && (vis || prev.vis)) {
+            ctx.strokeStyle = cable; ctx.lineWidth = Math.max(.5, Math.min(b[2], prev.k) * .028 + .4); ctx.beginPath();
+            for (const [dl, hh] of [[-.8, 7.65], [0, 7.95], [.8, 7.65]]) {
+              const p0 = project(Math.max(s, origin + 1.5), l + dl, hh), p1 = project(prev.s, l + dl, hh), pm = project((Math.max(s, origin + 1.5) + prev.s) / 2, l + dl, hh - 1.1);
+              ctx.moveTo(p0[0], p0[1]); ctx.quadraticCurveTo(2 * pm[0] - (p0[0] + p1[0]) / 2, 2 * pm[1] - (p0[1] + p1[1]) / 2, p1[0], p1[1]);
+            }
+            ctx.stroke();
+          }
+          prev = { s, k: b[2], vis };
         }
       }
       // Balizadores com refletor (a cada 20 m) e marcos de quilômetro (a cada 100 m)
@@ -5898,7 +5923,8 @@
         ctx.restore();
         if (cityRoute()) { ctx.save(); ctx.globalCompositeOperation = 'screen'; cityProps(project, origin, true); ctx.restore() }
       }
-      if (night || raining) {
+      if (night && nightCinema()) { nightPass(project, origin, horizon); if (raining) { ctx.fillStyle = 'rgba(38,54,64,.10)'; ctx.fillRect(0, 0, w, h) } }
+      else if (night || raining) {
         ctx.fillStyle = night ? (portRoute() ? 'rgba(5,12,28,.29)' : 'rgba(5,12,28,.43)') : 'rgba(38,54,64,.16)';
         ctx.fillRect(0, 0, w, h);
       }
@@ -5940,6 +5966,7 @@
           lampGlow(px - k * 2.04, py + k * (.045 + n * .27), k * .34, ['#ff4b398c', '#ffbd3e8c', '#4edf8a8c'][n]);
         }
         ctx.restore();
+        if (nightCinema()) nightBloom(project, origin);
       }
       if (raining) {
         const count = liteGraphics() ? 43 : w < 650 ? 65 : 115, t = last * .001;
@@ -11000,6 +11027,96 @@
       gtTxt(); msRefreshButtons();
       $('start').addEventListener('click', () => setTimeout(() => { try { ghostStart() } catch (e) { } }, 0));
     } catch (e) { }
+
+    // ---------- Noite de cinema: mapa de luz (escuro em volta, claro só onde a luz chega) ----------
+    const nightLayer = document.createElement('canvas'), nightG = nightLayer.getContext('2d');
+    let grainTile = null;
+    const NIGHT_DBG = { off: false, ms: 0 };
+    function nightCinema() { return night && !NIGHT_DBG.off && !liteGraphics() && camMode <= 2 }
+    function nightPass(project, origin, horizon) {
+      const t0 = performance.now();
+      const sc = .25, lw = Math.max(2, Math.round(w * sc)), lh = Math.max(2, Math.round(h * sc));
+      if (nightLayer.width !== lw || nightLayer.height !== lh) { nightLayer.width = lw; nightLayer.height = lh }
+      const g = nightG, city = cityRoute(), port = portRoute();
+      const base = city ? .6 : port ? .5 : .9;
+      g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, lw, lh);
+      const hy = clamp(horizon * sc, 0, lh), vg = g.createLinearGradient(0, 0, 0, lh);
+      vg.addColorStop(0, 'rgba(4,8,18,' + (base * .74) + ')');
+      vg.addColorStop(clamp(hy / lh, .05, .9), 'rgba(4,8,18,' + (base * .9) + ')');
+      vg.addColorStop(1, 'rgba(3,6,14,' + base + ')');
+      g.fillStyle = vg; g.fillRect(0, 0, lw, lh);
+      g.setTransform(sc, 0, 0, sc, 0, 0); g.globalCompositeOperation = 'destination-out';
+      const hole = (px, py, rx, ry, a) => {
+        if (!(rx > .5) || px + rx < 0 || px - rx > w || py + ry < 0 || py - ry > h) return;
+        const rg = g.createRadialGradient(px, py, 0, px, py, rx);
+        rg.addColorStop(0, 'rgba(0,0,0,' + a + ')'); rg.addColorStop(.5, 'rgba(0,0,0,' + a * .55 + ')'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+        g.save(); g.translate(px, py); g.scale(1, ry / rx); g.translate(-px, -py);
+        g.fillStyle = rg; g.fillRect(px - rx, py - rx, rx * 2, rx * 2); g.restore();
+      };
+      // luz ambiente em volta do próprio carro (ele não some no escuro)
+      { const [px, py, k] = project(z + 2.2, x); hole(px, py - k * .5, k * 3.2, k * 1.6, .5) }
+      // faróis: manchas de luz no asfalto seguindo a curva da estrada
+      if (headlightsOn()) {
+        const beam = [[4, 2.8, .95], [8, 3.4, .95], [13, 4, .92], [20, 4.6, .86], [29, 5.2, .74], [40, 5.8, .56], [55, 6.4, .38], [75, 7, .2]];
+        for (const [d, r, a] of beam) {
+          const [px, py, k] = project(z + d, x);
+          hole(px, py, k * r, k * r * .42, a);
+        }
+        // cone mais fraco subindo pelos objetos da beira (árvores perto do farol)
+        for (const [d, a] of [[14, .32], [26, .26], [42, .18]]) {
+          const s = z + d, [px, py, k] = project(s, x, 2.2);
+          hole(px, py, k * 6.5, k * 3, a);
+        }
+      }
+      // carros: lanternas/faróis abrem um pouco de luz em volta
+      for (const car of traffic) {
+        const face = car.s - car.type.half, d = face - origin;
+        if (d < 2 || d > 230) continue;
+        const [px, py, k] = project(face, car.lane, car.type.height * .4);
+        if (car.direction < 0) {
+          hole(px, py, k * 3, k * 1.3, .55);
+          for (const dd of [6, 14, 24]) { if (face - dd <= origin + 1) break; const [qx, qy, kk] = project(face - dd, car.lane); hole(qx, qy, kk * (2.4 + dd * .08), kk * 1, .5 - dd * .012) }
+        } else hole(px, py, k * 2.2, k * 1.1, car.braking ? .5 : .32);
+      }
+      g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over';
+      ctx.save(); ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(nightLayer, 0, 0, w, h);
+      ctx.restore();
+      NIGHT_DBG.ms = NIGHT_DBG.ms * .9 + (performance.now() - t0) * .1;
+    }
+    // granulado leve (estilo filmagem) — textura pequena pré-gerada, repetida
+    function filmGrain() {
+      if (!grainTile) {
+        grainTile = document.createElement('canvas'); grainTile.width = grainTile.height = 96;
+        const g = grainTile.getContext('2d'), im = g.createImageData(96, 96);
+        for (let i = 0; i < im.data.length; i += 4) { const v = Math.random() < .5 ? 0 : 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = Math.random() * 16 | 0 }
+        g.putImageData(im, 0, 0); grainTile.pat = ctx.createPattern(grainTile, 'repeat');
+      }
+      ctx.save();
+      const ox = (Math.random() * 96) | 0, oy = (Math.random() * 96) | 0;
+      ctx.translate(-ox, -oy); ctx.fillStyle = grainTile.pat; ctx.fillRect(ox, oy, w, h);
+      ctx.restore();
+    }
+    // brilho maior nas luzes (lanternas dos carros à frente) — desenhado por cima do escuro
+    function nightBloom(project, origin) {
+      ctx.save(); ctx.globalCompositeOperation = 'screen';
+      for (const car of traffic) {
+        const face = car.s - car.type.half, d = face - origin;
+        if (d < 2 || d > 230) continue;
+        for (const side of car.type.motorcycle || car.type.sprite === 'touring' ? [0] : [-1, 1]) {
+          const [px, py, k] = project(face, car.lane + side * car.type.width * .34, car.type.height * .33);
+          if (car.direction < 0) lampGlow(px, py, k * .9, '#fff1cc40');
+          else {
+            lampGlow(px, py, k * (car.braking ? .95 : .6), car.braking ? '#ff3a2a55' : '#ff302033');
+            // reflexo vermelho no asfalto
+            const [rx, ry, rk] = project(face + .3, car.lane + side * car.type.width * .34, 0);
+            ctx.save(); ctx.translate(rx, ry); ctx.scale(.35, 1.6); lampGlow(0, 0, rk * .45, raining ? '#ff3a2a50' : '#ff3a2a22'); ctx.restore();
+          }
+        }
+      }
+      ctx.restore();
+    }
+    window.NIGHT = NIGHT_DBG;
 
     requestAnimationFrame(frame);
 
