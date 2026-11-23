@@ -2100,7 +2100,7 @@
       rivals = pick.map((ri, n) => ({ name: roster[ri].name, type: { ...vehicleTypes[5], sprite: roster[ri].sprite, width: 1.8, height: 1.47 },
         s: grid[n][0], lane: grid[n][1], aim: grid[n][1], direction: 1, speed: 0, target: (roster[ri].target + champBoost()) * diff().rival,
         style: roster[ri].style || styles[(n + route.kind) % 3], driver: roster[ri].driver, lines: roster[ri].lines, nitro: 1, boost: 0, mistake: 0, talkAt: -99 }));
-      try { const r0 = rivals[Math.floor(Math.random() * rivals.length)]; rivalSay(r0, 'start', true) } catch (e) { }
+      try { const r0 = rivalMemory() || rivals[Math.floor(Math.random() * rivals.length)]; rivalSay(r0, 'start', true) } catch (e) { }
       position = rivals.length + 1; startCountdown = 3; drafting = false; lastPosition = position;
     }
     function updateDuel(dt) {
@@ -2506,7 +2506,7 @@
       if (urban) updateUrbanLaneChanges(dt);
       const movingTraffic = queuedTraffic ? [...traffic].sort((a, b) => b.s - a.s) : traffic;
       for (const [index, car] of movingTraffic.entries()) {
-        let stopAt = Infinity, approachSpeed = car.type.speed;
+        let stopAt = Infinity, approachSpeed = car.type.speed * (car.surprise > 0 ? .3 : 1);
         if (queuedTraffic && car.direction > 0) {
           const signal = urban ? checks.find(c => c.kind === 'signal' && c.s > car.s) : null;
           if (signal && signalAt(elapsed, signal.s) !== 'green' && car.s + car.type.half < signal.s) {
@@ -2801,7 +2801,7 @@
       deliveryRun = deliveryMode(); deliveryStop = 0;
       initChallenges();
       indicator = 'off'; headlightOverride = null; duel = duelMode();
-      rivals = []; streetReset(); if (duel) { seedRivals(); if (streetMode()) checks = checks.filter(c => c.kind === 'police'); else { traffic = []; checks = [] } showBonus(true) }
+      rivals = []; streetReset(); rivalsRecorded = false; if (duel) { seedRivals(); if (streetMode()) checks = checks.filter(c => c.kind === 'police'); else { traffic = []; checks = [] } showBonus(true) }
       wheelAngle = heading = tireSlip = bodyRoll = bodyYaw = bodyPitch = suspension = cameraHeading = 0;
       cameraLateral = x;
       lateralSpeed = cleanDistance = ghostIndex = 0; replay = [[0, 0, x]]; ghost = null;
@@ -5366,6 +5366,10 @@
       if (k > 4) { ctx.fillStyle = '#1b1b1b'; ctx.font = 'bold ' + Math.round(k * .26) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(item.text, px, top - bh * .1) }
     }
     function drawChallenges(project, strip, origin) {
+      drawChallengesBase(project, strip, origin);
+      if (!(typeof nightCinema === 'function' && nightCinema())) try { npcLights(project, origin) } catch (e) { }
+    }
+    function drawChallengesBase(project, strip, origin) {
       for (const bump of checks) {
         if (bump.kind === 'bump' && bump.s + 1.1 > origin + .59 && bump.s < origin + 260) {
           drawSpeedBump(bump.s,bump.limit,project,origin);
@@ -8619,6 +8623,7 @@
       if (distance > 0) st.km = (st.km || 0) + distance;
       if (duel && drafting) st.draft = (st.draft || 0) + dt;
       if (duel) { updateDuel(dt); if (streetMode()) { updateChallenges(dt, previousZ); streetTick(dt) } } else updateChallenges(dt, previousZ);
+      try { npcTick(dt) } catch (e) { }
       if (cop) { try { updateChase(dt) } catch (e) { } if (mode !== 'race') return; }
       try { updateTollGate(dt) } catch (e) { }
       try { updateRaceEvents(dt) } catch (e) { }
@@ -8652,7 +8657,7 @@
         const finalPts = Math.floor(points) + bonus;
         const pay = raceCredits(finalPts);
         career.credits += pay.total; try { saveCareer() } catch (e) { }
-        let result = dailyMode() ? dailyFinish() : champMode() ? champFinish() : duel ? duelAward() : careerRun ? finishCareer() : '';
+        let result = dailyMode() ? dailyFinish() : champMode() ? (rivalRecord(), champFinish()) : duel ? duelAward() + rivalRecord() : careerRun ? finishCareer() : '';
         try { const ml = careerRun ? (career.medals[eventId()] || 0) : 0; result += awardXp(Math.floor(points) + bonus, ml) } catch (e) { }
         try {
           if (!raceHits) st.clean = (st.clean || 0) + 1;
@@ -11366,6 +11371,7 @@
     }
     // brilho maior nas luzes (lanternas dos carros à frente) — desenhado por cima do escuro
     function nightBloom(project, origin) {
+      try { npcLights(project, origin) } catch (e) { }
       ctx.save(); ctx.globalCompositeOperation = 'screen';
       for (const car of traffic) {
         const face = car.s - car.type.half, d = face - origin;
@@ -11544,7 +11550,7 @@
           const ahead = far + 70 + rand(elapsed * 7.3 + car.s) * 110;
           if (ahead > total - 30) continue;
           car.s = ahead; car.begun = false; car.done = false; car.valid = true; car.passed = false;
-          car.currentSpeed = car.type.speed; car.braking = false; car.waitingInQueue = false;
+          car.currentSpeed = car.type.speed; car.braking = false; car.waitingInQueue = false; car.surpriseUsed = false; car.honked = false; car.warned = false; car.signal = 0; car.laneMove = false;
           const w = route.width * .48;
           if (car.direction > 0) car.lane = rand(car.s * 1.7) < .5 ? w : -w * (route.kind >= 5 ? 1 : -1);
           ST.prev.delete(car);
@@ -11566,6 +11572,107 @@
       } catch (e) { }
     }
     setTimeout(() => { try { $('streetLen').onchange = () => { try { showCareer() } catch (e) { } } } catch (e) { } }, 0);
+
+    // ===================== NPCs com mais vida =====================
+    // ---- 1. Rivais que lembram de você ----
+    function rivalBook() { if (!career.rivalRec || typeof career.rivalRec !== 'object') career.rivalRec = {}; return career.rivalRec }
+    function rivalMemory() {
+      const book = rivalBook();
+      for (const r of rivals) {
+        const rec = book[r.driver]; if (!rec || !(rec.w + rec.l)) continue;
+        const L = r.lines = { ...(r.lines || {}) }, w = rec.w, l = rec.l, last = rec.last;
+        const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+        if (last === 'lost' && Math.random() < .5) L.start = pick(['De novo você? Hoje eu desconto a última!', 'Fiquei te devendo aquela. Hoje é revanche!', 'Treinei a semana toda pra essa revanche.']);
+        else if (l > w) L.start = pick(['Já te venci ' + l + ' vez' + (l > 1 ? 'es' : '') + '. Vai ser mais uma!', 'Placar: ' + l + ' a ' + w + ' pra mim. Acostuma!', 'Você ainda não aprendeu, né?']);
+        else if (w > l) L.start = pick(['Tá bom, você é rápido… mas hoje é diferente.', w + ' a ' + l + ' pra você. Hoje eu viro esse placar!', 'Respeito. Mas não vou facilitar.']);
+        else L.start = pick(['Empatados em ' + w + ' a ' + l + '. Hoje desempata!', 'Placar igual. Quem ganhar hoje leva a melhor.']);
+        if (w >= 3 && w > l) L.passMe = pick(['Finalmente passei você!', 'Hoje o placar vai mudar!']);
+        if (l >= 3 && l > w) L.passed = pick(['Calma que eu volto…', 'Isso não vai durar!']);
+      }
+      // quem mais tem história com você é quem fala na largada
+      const talk = [...rivals].sort((a, b) => { const A = book[a.driver], B = book[b.driver]; return ((B?.w || 0) + (B?.l || 0)) - ((A?.w || 0) + (A?.l || 0)) })[0];
+      return talk;
+    }
+    let rivalsRecorded = false;
+    function rivalRecord() {
+      if (rivalsRecorded || !rivals.length) return '';
+      rivalsRecorded = true;
+      const book = rivalBook(), parts = [];
+      for (const r of rivals) {
+        const lost = r.finish !== undefined && r.finish < elapsed; // o rival cruzou antes de você
+        const rec = book[r.driver] || (book[r.driver] = { w: 0, l: 0 });
+        if (lost) rec.l++; else rec.w++;
+        rec.last = lost ? 'won' : 'lost'; // do ponto de vista do rival
+        parts.push(r.driver + ' ' + rec.w + '×' + rec.l);
+      }
+      try { saveCareer() } catch (e) { }
+      return parts.length ? ' · Placar contra os rivais: ' + parts.join(', ') : '';
+    }
+    // ---- 2. Trânsito com mais vida ----
+    let npcHornAt = -9;
+    function npcHorn(low) {
+      if (elapsed - npcHornAt < 1.2) return; npcHornAt = elapsed;
+      try {
+        if (muted) return; audio(); if (!sound) return;
+        const ac = sound.ac, t = ac.currentTime, g = ac.createGain();
+        g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.06, t + .03);
+        g.gain.setValueAtTime(.06, t + .22); g.gain.exponentialRampToValueAtTime(.0001, t + .5); g.connect(ac.destination);
+        for (const hz of low ? [262, 330] : [370, 466]) { const o = ac.createOscillator(); o.type = 'square'; o.frequency.value = hz; const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1400; o.connect(f).connect(g); o.start(t); o.stop(t + .52) }
+      } catch (e) { }
+    }
+    function npcTick(dt) {
+      if (mode !== 'race' || !traffic.length) return;
+      const urban = cityRoute(), twoLanes = !urban && route.kind >= 5 && route.kind !== 8;
+      for (const car of traffic) {
+        const delta = car.s - z;
+        if (car.surprise > 0) car.surprise -= dt;
+        if (car.flash > 0) car.flash -= dt;
+        // contramão: quem vem de frente pisca o farol e buzina se você estiver na faixa dele
+        if (car.direction < 0 && delta > 12 && delta < 75 && Math.abs(x - car.lane) < 2 && !car.warned) {
+          car.warned = true; car.flash = 1.4; npcHorn(true);
+          roadNote = '🚘 Carro na contramão piscou o farol!'; roadNoteTime = 1.6;
+        }
+        if (car.direction < 0 && delta < 0) car.warned = false;
+        if (car.direction <= 0 || car.done) continue;
+        // freada do nada: às vezes o carro da frente freia forte (com luz de freio)
+        if (!car.surpriseUsed && delta > 22 && delta < 48 && Math.abs(x - car.lane) < 1.8 && v > 14 && rand(car.s * .37 + (car.type.half || 2)) < .18) {
+          car.surpriseUsed = true; car.surprise = 1.7;
+        }
+        // troca de faixa com seta (rodovias de pista dupla)
+        if (twoLanes && !car.laneMove && !car.signal && delta > 30 && delta < 160 && Math.random() < dt * .05) {
+          const W = route.width * .48, to = car.lane > 0 ? -W : W;
+          const busy = traffic.some(o => o !== car && o.direction > 0 && Math.abs(o.lane - to) < 1 && Math.abs(o.s - car.s) < 22) || rivals.some(r => Math.abs(r.lane - to) < 1.4 && Math.abs(r.s - car.s) < 18);
+          if (!busy) { car.signal = 1.4; car.laneTo = to }
+        }
+        if (car.signal > 0) { car.signal -= dt; if (car.signal <= 0) { car.signal = 0; car.laneMove = true } }
+        if (car.laneMove) {
+          const d = car.laneTo - car.lane, stepL = Math.sign(d) * Math.min(Math.abs(d), 1.15 * dt);
+          car.lane += stepL;
+          if (Math.abs(car.laneTo - car.lane) < .02) { car.lane = car.laneTo; car.laneMove = false }
+        }
+        // você colou atrás e está mais lento? quem vem atrás buzina
+        if (delta < -4 && delta > -14 && Math.abs(x - car.lane) < 1.6 && (car.currentSpeed ?? car.type.speed) > v + 2 && !car.honked) { car.honked = true; car.flash = 1; npcHorn(false); roadNote = '📢 Buzinaram atrás de você'; roadNoteTime = 1.4 }
+      }
+    }
+    // seta piscando e farol alto piscando (desenhados por cima, como luzes)
+    function npcLights(project, origin) {
+      if (mode !== 'race' && mode !== 'pause') return;
+      const blink = Math.floor(elapsed * 3) % 2 === 0;
+      ctx.save(); ctx.globalCompositeOperation = 'screen';
+      for (const car of traffic) {
+        const d = car.s - origin; if (d < 2 || d > 200) continue;
+        if (car.direction > 0 && (car.signal > 0 || car.laneMove) && blink) {
+          const side = Math.sign((car.laneTo ?? 0) - car.lane) || 1, face = car.s - car.type.half;
+          const [px, py, k] = project(face, car.lane + side * car.type.width * .42, car.type.height * .36);
+          lampGlow(px, py, Math.max(6, k * .75), '#ffa41cf0'); ctx.save(); ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#ffb02e'; ctx.fillRect(px - Math.max(2, k * .14), py - Math.max(1.5, k * .07), Math.max(4, k * .28), Math.max(3, k * .14)); ctx.restore();
+        }
+        if (car.flash > 0 && Math.floor(elapsed * 8) % 2 === 0) {
+          const face = car.direction < 0 ? car.s - car.type.half : car.s + car.type.half;
+          for (const sd of [-1, 1]) { const [px, py, k] = project(face, car.lane + sd * car.type.width * .32, car.type.height * .3); lampGlow(px, py, Math.max(4, k * 1.1), '#fff6dcd0') }
+        }
+      }
+      ctx.restore();
+    }
 
     requestAnimationFrame(frame);
 
