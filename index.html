@@ -1168,6 +1168,9 @@
     .arrTracks button span { color: #b9c6b2; font-size: .75rem; line-height: 1.3 }
     .arrTracks button.on { border-color: #d6ff60; background: #d6ff6018; box-shadow: inset 0 0 0 1px #d6ff60 }
     @media (max-width: 640px) { .arrTracks { grid-template-columns: 1fr } .arrTracks button span { display: none } }
+    #bossBox { margin: 8px 0 4px; display: grid; gap: 4px }
+    #bossBox button { padding: 9px 12px; border-radius: 12px; border: 1px solid #ffd23f; background: linear-gradient(90deg, #3a2a05, #2a2108); color: #ffe27a; font-weight: 800; text-align: left; cursor: pointer }
+    #bossBox small { color: #b9c6b2; font-size: .78rem }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -2100,6 +2103,7 @@
       rivals = pick.map((ri, n) => ({ name: roster[ri].name, type: { ...vehicleTypes[5], sprite: roster[ri].sprite, width: 1.8, height: 1.47 },
         s: grid[n][0], lane: grid[n][1], aim: grid[n][1], direction: 1, speed: 0, target: (roster[ri].target + champBoost()) * diff().rival,
         style: roster[ri].style || styles[(n + route.kind) % 3], driver: roster[ri].driver, lines: roster[ri].lines, nitro: 1, boost: 0, mistake: 0, talkAt: -99 }));
+      if (bossActive) rivals = [bossRival(wLane)];
       try { const r0 = rivalMemory() || rivals[Math.floor(Math.random() * rivals.length)]; rivalSay(r0, 'start', true) } catch (e) { }
       position = rivals.length + 1; startCountdown = 3; drafting = false; lastPosition = position;
     }
@@ -2682,7 +2686,7 @@
     function applyMenuTabs() {
       const menu = $('menu'); if (!menu) return;
       const groups = {
-        race: [$('openTutorial'), $('difficulty')?.closest('label'), $('gameMode')?.closest('label'), $('route')?.closest('label'), $('transmissionMode')?.closest('label'), $('environment'), $('careerPanel'), $('routeDescription'), $('mapAttribution'), $('controlsHelp')],
+        race: [$('openTutorial'), $('difficulty')?.closest('label'), $('gameMode')?.closest('label'), $('streetLenBox'), $('route')?.closest('label'), $('transmissionMode')?.closest('label'), $('environment'), $('careerPanel'), $('routeDescription'), $('mapAttribution'), $('controlsHelp')],
         car: [$('car')?.closest('label'), $('garageShowcase'), $('vehicleProfile'), $('pilotBox'), $('customizer')],
         shop: [$('office')],
         ach: [$('achPanel')]
@@ -2746,6 +2750,7 @@
       if (duelMode()) { $('eventTitle').textContent = 'Duelo · ' + route.name; $('eventGoals').textContent = (cityRoute() ? 'Percurso urbano' : 'Duas voltas') + ' · dois rivais · pista fechada'; }
       if (streetMode()) { const lp = Math.round(raceDistance() / length); $('eventTitle').textContent = 'Racha de rua · ' + route.name; $('eventGoals').textContent = (lp > 1 ? lp + ' voltas · ' : 'Percurso de ida · ') + (lp * length / 1000).toFixed(1).replace('.', ',') + ' km · 3 rivais · noite com trânsito e blitz. Nitro (Espaço) em qualquer carro: recarrega passando raspando no trânsito e no vácuo dos rivais. Prêmio: ' + Math.round(350 * Math.max(1, streetKm() / 3)) + ' créditos para o 1º.' }
       if ($('streetLenBox')) $('streetLenBox').hidden = !streetMode();
+      try { bossPanel() } catch (e) { }
       if (dailyMode()) {
         const d = dailySetup(), best = daily.best[dayStamp()], streak = dailyStreak();
         $('eventTitle').textContent = 'Desafio diário · ' + routes[d.route].name;
@@ -2801,7 +2806,7 @@
       deliveryRun = deliveryMode(); deliveryStop = 0;
       initChallenges();
       indicator = 'off'; headlightOverride = null; duel = duelMode();
-      rivals = []; streetReset(); rivalsRecorded = false; if (duel) { seedRivals(); if (streetMode()) checks = checks.filter(c => c.kind === 'police'); else { traffic = []; checks = [] } showBonus(true) }
+      rivals = []; streetReset(); rivalsRecorded = false; bossActive = bossNext && $('gameMode').value === 'rivals'; bossNext = false; if (duel) { seedRivals(); if (streetMode()) checks = checks.filter(c => c.kind === 'police'); else { traffic = []; checks = [] } showBonus(true) }
       wheelAngle = heading = tireSlip = bodyRoll = bodyYaw = bodyPitch = suspension = cameraHeading = 0;
       cameraLateral = x;
       lateralSpeed = cleanDistance = ghostIndex = 0; replay = [[0, 0, x]]; ghost = null;
@@ -7251,6 +7256,7 @@
         }
       }
       if (brake && car.centerBrakeLamp !== false) lampGlowLocal(0, -height * .67, pixels * .052, '#ff382ed0');
+      try { exhaustFlame(pixels, height) } catch (e) { }
       ctx.restore();
     }
     function lampGlowLocal(x, y, r, color) {
@@ -8303,6 +8309,7 @@
     }, { passive: true, capture: true });
     document.addEventListener('visibilitychange', () => { if (!document.hidden && sound && !muted) sound.ac.resume().catch(() => { }) });
     function duelAward() {
+      if (bossActive) return bossAward();
       const payout = [0, 350, 200, 100, 0].map(p => Math.round(p * (streetMode() ? Math.max(1, streetKm() / 3) : 1)));
       if (position === 1 && diffLevel() >= 2) career.stats.hardDuel = Math.max(career.stats.hardDuel || 0, diffLevel());
       const previous = career.duelPrize || 0, earned = Math.max(0, Math.round(payout[position] * diff().reward) - previous);
@@ -8666,6 +8673,7 @@
           if (night) st.night = 1; if (raining) st.rain = 1;
           st.phases = st.phases || {}; st.phases[dayPhase] = 1;
           if (duel && !champMode() && position === 1) st.duelWins = (st.duelWins || 0) + 1;
+          if (duel && !champMode() && !bossActive && position === 1) { career.routeWins = career.routeWins || {}; career.routeWins[$('route').selectedIndex] = (career.routeWins[$('route').selectedIndex] || 0) + 1 }
           const got = checkAchievements(); if (got) result += ' · Conquista: +' + got + ' créditos';
         } catch (e) { }
         if (raceFines.length) {
@@ -11560,13 +11568,13 @@
     }
     // neon embaixo do carro do jogador (luz no asfalto)
     function streetGlow(project, late) {
-      if (!streetMode() || (mode !== 'race' && mode !== 'pause' && mode !== 'finish')) return;
+      if (!neonActive() || (mode !== 'race' && mode !== 'pause' && mode !== 'finish')) return;
       try {
         const [px, py, k] = project(z + 1.2, x); if (k < 1) return;
         const pulse = (.85 + .15 * Math.sin(elapsed * 6)) * (typeof nightCinema === 'function' && nightCinema() ? 2.1 : 1);
         ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.translate(px, py); ctx.scale(1, .32);
         const r = k * 2.9, g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-        const col = ['56,200,255', '255,60,200', '120,255,120'][(career.drag?.ui?.neon | 0) % 3];
+        const col = neonColor(); if (!col) { ctx.restore(); return }
         g.addColorStop(0, 'rgba(' + col + ',' + Math.min(1, .7 * pulse) + ')'); g.addColorStop(.55, 'rgba(' + col + ',' + Math.min(1, .3 * pulse) + ')'); g.addColorStop(1, 'rgba(' + col + ',0)');
         ctx.fillStyle = g; ctx.fillRect(-r, -r, r * 2, r * 2); ctx.restore();
       } catch (e) { }
@@ -11673,6 +11681,125 @@
       }
       ctx.restore();
     }
+
+    // ===================== Visual do carro (neon e chama) · Narrador · Dono da pista =====================
+    // ---------- Visual: neon embaixo do carro e chama no escapamento ----------
+    const NEON = [['off', 'Sem neon', null], ['azul', 'Azul', '56,200,255'], ['rosa', 'Rosa', '255,60,200'], ['verde', 'Verde', '120,255,120'], ['roxo', 'Roxo', '160,90,255'], ['laranja', 'Laranja', '255,150,40'], ['vermelho', 'Vermelho', '255,50,50']];
+    function look() { if (!career.look || typeof career.look !== 'object') career.look = { neon: 'azul', where: 'racha', flame: 'on' }; return career.look }
+    function neonColor() { const n = NEON.find(o => o[0] === look().neon); return n ? n[2] : null }
+    function neonActive() { if (!neonColor()) return false; const L = look(); return streetMode() || (L.where === 'noite' && (night || retro)) || L.where === 'sempre' }
+    function lookUI() {
+      const grid = $('customGrid'); if (!grid || $('neonColor')) return;
+      const L = look();
+      const mk = (id, label, opts, val, on) => { const l = document.createElement('label'); l.innerHTML = label + '<select id="' + id + '">' + opts.map(([v, t]) => '<option value="' + v + '"' + (v === val ? ' selected' : '') + '>' + t + '</option>').join('') + '</select>'; grid.append(l); l.querySelector('select').onchange = e => { on(e.target.value); try { saveCareer() } catch (x) { } } };
+      mk('neonColor', 'Neon embaixo do carro', NEON.map(([v, t]) => [v, t]), L.neon, v => look().neon = v);
+      mk('neonWhere', 'Quando ligar o neon', [['racha', 'Só no Racha de rua'], ['noite', 'Em toda corrida à noite'], ['sempre', 'Sempre']], L.where, v => look().where = v);
+      mk('nitroFlame', 'Chama no escapamento (nitro)', [['on', 'Ligada'], ['off', 'Desligada']], L.flame, v => look().flame = v);
+    }
+    setTimeout(() => { try { lookUI() } catch (e) { } }, 0);
+    // chama azul-laranja saindo do escapamento quando o nitro está ligado (coordenadas locais do carro)
+    function exhaustFlame(pixels, height) {
+      if (!nitroOn || look().flame === 'off' || mode !== 'race') return;
+      const ex = -pixels * .27, ey = -height * .1, len = pixels * (.16 + Math.random() * .12);
+      ctx.save(); ctx.globalCompositeOperation = 'screen';
+      for (const [r, c] of [[1, 'rgba(255,140,40,.85)'], [.62, 'rgba(255,230,140,.9)'], [.3, 'rgba(120,180,255,.95)']]) {
+        ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(ex - pixels * .035 * r, ey); ctx.quadraticCurveTo(ex, ey + len * r * 1.2, ex + pixels * .035 * r, ey); ctx.fill();
+      }
+      lampGlowLocal(ex, ey + len * .3, pixels * .12, '#ff8a2a90');
+      ctx.restore();
+    }
+    // ---------- Narrador (voz do próprio aparelho, em português) ----------
+    const NAR = { on: true, last: '', at: 0, mode: 'menu', lap: 0, pos: 0, note: '', voice: null, cop: false };
+    try { NAR.on = localStorage.getItem('pista-studio-narrador') !== 'off' } catch (e) { }
+    function narVoice() {
+      if (NAR.voice !== null) return NAR.voice;
+      try { const vs = speechSynthesis.getVoices(); NAR.voice = vs.find(v => /pt[-_]BR/i.test(v.lang)) || vs.find(v => /^pt/i.test(v.lang)) || (vs.length ? false : null) } catch (e) { NAR.voice = false }
+      return NAR.voice;
+    }
+    try { speechSynthesis.onvoiceschanged = () => { NAR.voice = null } } catch (e) { }
+    function narrate(text, prio = 0) {
+      if (!NAR.on || muted || !('speechSynthesis' in window)) return;
+      const now = performance.now();
+      try {
+        if (speechSynthesis.speaking) { if (prio < 2) return; speechSynthesis.cancel() }
+        if (prio < 1 && now - NAR.at < 2500) return;
+        if (text === NAR.last && now - NAR.at < 6000) return;
+        const u = new SpeechSynthesisUtterance(text), v = narVoice();
+        u.lang = 'pt-BR'; if (v) u.voice = v; u.rate = 1.12; u.pitch = 1; u.volume = .95;
+        speechSynthesis.speak(u); NAR.last = text; NAR.at = now;
+      } catch (e) { }
+    }
+    function narTick() {
+      try {
+        if (mode === 'race' && NAR.mode !== 'race' && NAR.mode !== 'pause') { NAR.lap = 0; NAR.pos = 0; NAR.cop = false; narrate(bossActive ? 'Desafio contra o dono da pista. Valendo!' : streetMode() ? 'Racha valendo! Boa sorte.' : 'Valendo!', 2) }
+        if (mode === 'race') {
+          const total = Math.round(raceDistance() / length), lap = Math.floor(z / length);
+          if (total > 1 && lap > NAR.lap && lap < total) { const left = total - lap; narrate(left === 1 ? 'Última volta!' : 'Faltam ' + left + ' voltas!', 1) }
+          NAR.lap = lap;
+          if (duel && rivals.length && elapsed > 4) {
+            if (NAR.pos && position < NAR.pos) { const passed = rivals.filter(r => r.s < z).sort((a, b) => b.s - a.s)[0]; narrate(position === 1 ? 'Você assumiu a liderança!' : 'Ultrapassou ' + (passed ? passed.driver : 'o rival') + '!', 1) }
+            else if (NAR.pos && position > NAR.pos) narrate('Perdeu uma posição!', 0);
+          }
+          NAR.pos = position;
+          if (cop && !NAR.cop && !chaseMode()) { NAR.cop = true; narrate('Polícia na cola!', 1) }
+          if (roadNote !== NAR.note) { NAR.note = roadNote; if (/^🚑/.test(roadNote)) narrate('Ambulância atrás, dê passagem!', 0); else if (/raspando|Raspou/.test(roadNote)) narrate('Raspou!', 0) }
+        }
+        if (mode === 'finish' && NAR.mode === 'race') {
+          if (bossActive) narrate(position === 1 ? 'Inacreditável! Você venceu o dono da pista!' : 'O dono da pista venceu desta vez.', 2);
+          else if (duel && rivals.length) narrate(position === 1 ? 'Vitória! Primeiro lugar!' : position + 'º lugar.', 2);
+          else narrate('Bandeirada!', 2);
+        }
+        NAR.mode = mode;
+      } catch (e) { }
+    }
+    setInterval(narTick, 250);
+    function narratorButton() {
+      const bar = $('xBar'); if (!bar || $('narBtn')) return;
+      const b = document.createElement('button'); b.type = 'button'; b.id = 'narBtn';
+      const paint = () => b.textContent = '🎙 Narrador: ' + (NAR.on ? 'ligado' : 'desligado');
+      paint(); b.onclick = () => { NAR.on = !NAR.on; try { localStorage.setItem('pista-studio-narrador', NAR.on ? 'on' : 'off') } catch (e) { } paint(); if (NAR.on) narrate('Narrador ligado!', 2); else try { speechSynthesis.cancel() } catch (e) { } };
+      bar.append(b);
+    }
+    setTimeout(() => { try { narratorButton() } catch (e) { } }, 50);
+    setTimeout(() => { try { narratorButton() } catch (e) { } }, 1500);
+    // ---------- Dono da pista (chefe de cada estrada) ----------
+    let bossNext = false, bossActive = false;
+    const BOSSES = [
+      ['Zé da Vicinal', 'car9', 'Aqui na terra quem manda sou eu.'], ['Tonho Pé-de-Chumbo', 'car16', 'A Perna Leste tem dono, rapaz.'], ['Marcão da Ponte', 'car20', 'Nessa ponte ninguém me passa.'],
+      ['Dra. Celeste', 'car25', 'Na Doca eu conheço cada esquina.'], ['Neguinho do Bosque', 'car13', 'A Almirante Barroso é minha casa.'], ['Rita Viaduto', 'car26', 'No viaduto eu voo baixo.'],
+      ['Capitão Júlio', 'car19', 'Daqui até o aeroporto, só dá eu.'], ['Gringo da Serra', 'car14', 'Curva de cotovelo é comigo.'], ['Paulão do Autódromo', 'car26', 'Três voltas e você vai ver minha traseira.'],
+      ['Mestre Bené', 'car25', 'Conheço Belém de olho fechado.'], ['Lady Neon', 'car22', 'O porto à noite é meu território.'], ['Cacique das Dunas', 'car16', 'O vento do litoral sopra a meu favor.'],
+      ['Ferrugem', 'car20', 'Na fábrica o ritmo é meu.'], ['Bicho do Mato', 'car9', 'Lama e pedra? Meu café da manhã.'], ['Dona Maré', 'car13', 'Na orla eu sou a rainha.'], ['Comandante Val', 'car26', 'Pista de aeroporto é pra decolar.']
+    ];
+    function bossFor(i) { return BOSSES[i % BOSSES.length] }
+    function bossUnlocked(i) { return ((career.routeWins || {})[i] || 0) >= 1 }
+    function bossRival(wLane) {
+      const [name, sprite, line] = bossFor($('route').selectedIndex);
+      const base = route.kind === 0 ? 33 : cityRoute() ? 36 : 41;
+      return { name: 'Dono da pista · ' + name, type: { ...vehicleTypes[5], sprite, width: 1.8, height: 1.47 }, s: 7, lane: -wLane, aim: -wLane, direction: 1, speed: 0, target: base * diff().rival,
+        style: 'agressivo', driver: name, lines: { start: line, passMe: 'Achou que ia ser fácil?', passed: 'Ninguém me passa duas vezes!', close: 'Encosta não!' }, nitro: 1, boost: 0, mistake: 0, talkAt: -99 };
+    }
+    function bossAward() {
+      const i = $('route').selectedIndex, [name] = bossFor(i); career.bossWins = career.bossWins || {};
+      if (position !== 1) return ' · ' + name + ' venceu desta vez. Tente de novo!';
+      const first = !career.bossWins[i]; career.bossWins[i] = (career.bossWins[i] || 0) + 1;
+      const prize = Math.round((first ? 1200 : 300) * diff().reward); career.credits += prize; try { saveCareer() } catch (e) { }
+      return ' · 👑 Você venceu ' + name + ', o dono da pista! +' + prize + ' créditos' + (first ? ' (primeira vitória)' : '');
+    }
+    function bossPanel() {
+      const panel = $('careerPanel'); if (!panel) return;
+      let box = $('bossBox');
+      const show = $('gameMode').value === 'rivals';
+      if (!show) { if (box) box.hidden = true; return }
+      if (!box) { box = document.createElement('div'); box.id = 'bossBox'; panel.insertBefore(box, $('careerBalance')); box.addEventListener('click', e => { if (e.target.closest('#bossGo')) { bossNext = true; $('start').click() } }) }
+      const i = $('route').selectedIndex, [name, sprite] = bossFor(i), won = (career.bossWins || {})[i];
+      box.hidden = false;
+      box.innerHTML = bossUnlocked(i)
+        ? '<button type="button" id="bossGo">👑 Desafiar o dono da pista: ' + name + (won ? ' · vencido ' + won + '×' : '') + '</button><small>Um contra um, com ' + (($('car').options[+sprite.slice(3)] || {}).text || 'carro preparado') + '. Prêmio: ' + (won ? 300 : 1200) + ' créditos.</small>'
+        : '<small>🔒 Vença um duelo nesta estrada (1º lugar) para desafiar o dono da pista, ' + name + '.</small>';
+    }
+    // iPhone/Safari só libera a voz depois de um toque: destrava no primeiro toque/clique
+    (() => { const unlock = () => { try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u) } catch (e) { } removeEventListener('pointerdown', unlock, true); removeEventListener('keydown', unlock, true) }; addEventListener('pointerdown', unlock, true); addEventListener('keydown', unlock, true) })();
 
     requestAnimationFrame(frame);
 
