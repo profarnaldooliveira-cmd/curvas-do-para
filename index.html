@@ -11860,8 +11860,9 @@
     busBodies.fire1 = ['#b3201b', .15]; busBodies.fire2 = ['#b3201b', .15]; busBodies.tow = ['#e9ebe9', .15];
     // caminhões novos: de longe/à frente usa só fotos (retas na faixa); colado ao lado, usa a caixa com a foto lateral em perspectiva
     function photoBigAhead(item, origin) {
-      const t = item.type, depC = item.s - origin, latC = Math.abs(center(item.s) + item.lane - (center(origin) + x));
-      return depC > t.half + 3.5 && Math.atan2(latC, depC) < .95;
+      // decide pela traseira (o ponto mais perto de você): foto reta só enquanto o caminhão está bem à frente
+      const t = item.type, depR = item.s - t.half - origin, latC = Math.abs(center(item.s) + item.lane - (center(origin) + x));
+      return depR > 3 && Math.atan2(latC, depR) < .42;
     }
     // coloca os veículos novos no trânsito trocando alguns caminhões/vans/carros existentes (mesma faixa e posição)
     function mixNewVehicles() {
