@@ -1193,6 +1193,13 @@
       #hud #backRace { padding-inline: 8px }
       #hudActions { gap: 4px; max-width: none }
     }
+    /* na pausa e no menu, nada da corrida fica por cima do menu */
+    body:not(.inRace) #deliveryPanel, body.paused #deliveryPanel, body.paused #nitroBar, body.paused #chalHud { display: none !important }
+    @media (max-width: 520px) and (orientation: portrait) {
+      #deliveryPanel .dvStep small { display: block; font-size: .72rem; line-height: 1.25 }
+      #deliveryPanel .dvTop { font-size: .86rem } #deliveryPanel .dvTop b { font-size: 1.15rem }
+      #deliveryPanel .dvStep b { font-size: .92rem }
+    }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -8770,7 +8777,8 @@
         }
       }
       const interval = mode === 'race' || mode === 'drag' ? (liteGraphics() ? 20 : 15.5) : 65;
-      if (now - lastPaint >= interval) {
+      if (mode !== 'pause') pauseFrozen = 0;
+      if (now - lastPaint >= interval && !(mode === 'pause' && pauseFrozen++ > 1)) {
         const paintGap = now - lastPaint;
         lastPaint = now;
         if (pendingRes) { pendingRes = false; resize(); lastPaint = now }
@@ -11909,6 +11917,32 @@
       for (const sd of [-1, 1]) { const [px, py, k] = project(cab, lane + sd * type.width * .32, type.height * .97); if (k < .2) continue; lampGlow(px, py, Math.max(3, k * (night ? .6 : .38)), (sd > 0) === !!blink ? '#ff2a1ee0' : '#ff2a1e30') }
       ctx.restore();
     }
+    // ===================== Organização da tela no celular (sem nada por cima de nada) =====================
+    let pauseFrozen = 0;
+    addEventListener('resize', () => { pauseFrozen = 0 });
+    function uiVisible(el) { return el && !el.hidden && el.getClientRects().length && getComputedStyle(el).display !== 'none' }
+    function uiLayout() {
+      try {
+        const racing = mode === 'race' || mode === 'pause';
+        document.body.classList.toggle('inRace', mode === 'race');
+        document.body.classList.toggle('paused', mode === 'pause');
+        if (!racing) return;
+        const hud = $('hud'); if (!uiVisible(hud)) return;
+        // painéis de bônus e de rota sempre logo abaixo dos botões do topo
+        let hb = 0; for (const c of hud.children) if (uiVisible(c) && c.id !== 'racePos' && c.id !== 'chaseBox') hb = Math.max(hb, c.getBoundingClientRect().bottom);
+        for (const id of ['bonusPanel', 'routeHUD']) { const el = $(id); if (!uiVisible(el)) continue; const want = Math.round(hb + 6); if (el.dataset.top != want) { el.style.setProperty('top', want + 'px', 'important'); el.dataset.top = want } }
+        // painel da entrega: acima dos pedais e ao lado da coluna de setas (nunca por cima dos botões)
+        const dp = $('deliveryPanel'); if (!uiVisible(dp)) return;
+        const portrait = innerHeight > innerWidth && innerWidth <= 600, sig = $('mobileSignals');
+        if (portrait && uiVisible(sig)) { const sr = sig.getBoundingClientRect(); dp.style.setProperty('left', Math.round(sr.right + 8) + 'px', 'important'); dp.style.setProperty('right', '8px', 'important'); dp.style.setProperty('width', 'auto', 'important'); dp.style.setProperty('transform', 'none', 'important') }
+        const pr = dp.getBoundingClientRect(); let top = innerHeight;
+        const obs = [...document.querySelectorAll('#touch button, #mobileSignals button, #nitroBar')].filter(uiVisible);
+        for (const o of obs) { const r = o.getBoundingClientRect(); if (r.right > pr.left + 2 && r.left < pr.right - 2 && r.top < innerHeight - 1) top = Math.min(top, r.top) }
+        const bottom = Math.max(8, Math.round(innerHeight - top + 8));
+        if (dp.dataset.bottom != bottom) { dp.style.setProperty('bottom', bottom + 'px', 'important'); dp.dataset.bottom = bottom }
+      } catch (e) { }
+    }
+    setInterval(uiLayout, 300); addEventListener('resize', () => setTimeout(uiLayout, 60)); addEventListener('orientationchange', () => setTimeout(uiLayout, 300));
 
     requestAnimationFrame(frame);
 
