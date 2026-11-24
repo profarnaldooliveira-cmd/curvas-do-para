@@ -1200,6 +1200,12 @@
       #deliveryPanel .dvTop { font-size: .86rem } #deliveryPanel .dvTop b { font-size: 1.15rem }
       #deliveryPanel .dvStep b { font-size: .92rem }
     }
+    /* celular em pé: sem o painel de bônus fixo; pontos e avisos aparecem num aviso rápido */
+    body.compactHud #bonusPanel { display: none !important }
+    #miniToast { position: fixed; left: max(10px, env(safe-area-inset-left)); max-width: 56vw; z-index: 32; background: #0e1612e8; color: #eef4ee; border: 1px solid #d6ff6055; border-radius: 12px; padding: 7px 11px; font: 600 .8rem/1.3 system-ui, sans-serif; pointer-events: none; opacity: 0; transform: translateY(-6px); transition: opacity .25s, transform .25s }
+    #miniToast b { color: #d6ff60; font-size: .95rem }
+    #miniToast.on { opacity: 1; transform: none }
+    body:not(.inRace) #miniToast { display: none }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -11928,6 +11934,10 @@
         document.body.classList.toggle('paused', mode === 'pause');
         if (!racing) return;
         const hud = $('hud'); if (!uiVisible(hud)) return;
+        // celular em pé: painel de bônus vira aviso rápido (topo mais limpo)
+        const compact = innerHeight > innerWidth && innerWidth <= 600;
+        document.body.classList.toggle('compactHud', compact);
+        uiToastTick(compact);
         // painéis de bônus e de rota sempre logo abaixo dos botões do topo
         let hb = 0; for (const c of hud.children) if (uiVisible(c) && c.id !== 'racePos' && c.id !== 'chaseBox') hb = Math.max(hb, c.getBoundingClientRect().bottom);
         for (const id of ['bonusPanel', 'routeHUD']) { const el = $(id); if (!uiVisible(el)) continue; const want = Math.round(hb + 6); if (el.dataset.top != want) { el.style.setProperty('top', want + 'px', 'important'); el.dataset.top = want } }
@@ -11943,6 +11953,22 @@
       } catch (e) { }
     }
     setInterval(uiLayout, 300); addEventListener('resize', () => setTimeout(uiLayout, 60)); addEventListener('orientationchange', () => setTimeout(uiLayout, 300));
+    const UT = { bonus: null, note: '', at: 0 };
+    function uiToastTick(compact) {
+      let t = $('miniToast');
+      if (!t) { t = document.createElement('div'); t.id = 'miniToast'; document.body.append(t) }
+      const hud = $('hud'); let hb = 0; for (const c of hud.children) if (uiVisible(c) && c.id !== 'racePos' && c.id !== 'chaseBox') hb = Math.max(hb, c.getBoundingClientRect().bottom);
+      t.style.top = Math.round(hb + 6) + 'px';
+      if (UT.bonus === null || mode !== 'race') { UT.bonus = bonus; UT.note = roadNoteTime > 0 ? roadNote : ''; if (mode !== 'race') t.classList.remove('on'); return }
+      let msg = '';
+      if (bonus > UT.bonus) { const last = bonusLog[bonusLog.length - 1]; msg = '<b>+' + (bonus - UT.bonus) + ' pts</b>' + (last ? ' · ' + last.label : '') }
+      UT.bonus = bonus;
+      const note = roadNoteTime > 0 ? roadNote : '';
+      if (note && note !== UT.note && !msg) msg = note.replace(/</g, '&lt;');
+      UT.note = note;
+      if (msg && compact) { t.innerHTML = msg; t.classList.add('on'); UT.at = performance.now() }
+      if (!compact || performance.now() - UT.at > 2600) t.classList.remove('on');
+    }
 
     requestAnimationFrame(frame);
 
