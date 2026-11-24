@@ -1171,6 +1171,28 @@
     #bossBox { margin: 8px 0 4px; display: grid; gap: 4px }
     #bossBox button { padding: 9px 12px; border-radius: 12px; border: 1px solid #ffd23f; background: linear-gradient(90deg, #3a2a05, #2a2108); color: #ffe27a; font-weight: 800; text-align: left; cursor: pointer }
     #bossBox small { color: #b9c6b2; font-size: .78rem }
+    /* botões Desistir e Câmera da Arrancada empilhados (nunca um por cima do outro) */
+    #ahBtns { position: absolute; right: max(10px, env(safe-area-inset-right)); top: calc(max(8px, env(safe-area-inset-top)) + 92px); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; z-index: 3 }
+    #ahBtns #ahQuit, #ahBtns #ahCam { position: static; pointer-events: auto; min-height: 34px }
+    @media (max-height: 460px) { #ahBtns { top: calc(max(6px, env(safe-area-inset-top)) + 70px) } }
+    /* HUD da corrida: respeita o entalhe/ilha do celular em pé e deitado, botões sempre por cima e com área de toque boa */
+    #hud { padding-top: max(clamp(12px, 3vw, 36px), env(safe-area-inset-top)); padding-right: max(clamp(12px, 3vw, 36px), env(safe-area-inset-right)); padding-left: max(clamp(12px, 3vw, 36px), env(safe-area-inset-left)); z-index: 30 }
+    #hudActions { position: relative; z-index: 31; max-width: 62vw }
+    #hudActions button { min-height: 32px }
+    @media (pointer: coarse) { #hudActions button { min-height: 36px; min-width: 36px } }
+    @media (max-height: 460px) and (orientation: landscape) { #hud { padding-top: max(6px, env(safe-area-inset-top)); padding-right: max(8px, env(safe-area-inset-right)); padding-left: max(8px, env(safe-area-inset-left)) } }
+    /* Nitro fica em cima do Acelerar (não empurra os pedais para cima dos botões de seta/buzina) */
+    #touch div:has(> #nitroBtn) { position: relative }
+    #nitroBtn { position: absolute; right: 0; bottom: calc(100% + 8px); background: #1a6bff; color: #fff; border-color: #6fb1ff; font-weight: 800 }
+    /* celulares estreitos: os botões do topo nunca saem da tela (quebram linha e o de câmera vira ícone) */
+    #hud { flex-wrap: wrap; row-gap: 4px }
+    #hudActions { margin-left: auto; flex-wrap: nowrap }
+    @media (max-width: 430px) {
+      #hud #camera { font-size: 0 !important; padding-inline: 8px }
+      #hud #camera::after { content: '🎥'; font-size: 16px; line-height: 1 }
+      #hud #backRace { padding-inline: 8px }
+      #hudActions { gap: 4px; max-width: none }
+    }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -9459,7 +9481,7 @@
         '<div class="ahGauge"><div class="ahRpm"><em id="ahWin"></em><i id="ahRpmFill"></i></div><div class="ahRow"><b id="ahGear">N</b><b id="ahSpeed">0</b><small>km/h</small><s id="ahShift">TROQUE</s></div></div></div>' +
         '<div class="ahDist"><b id="ahDist">0 m</b><small id="ahDistT">de 100 m</small><small id="ahSplit"></small></div></div>' +
         '<div id="ahWarn"></div><div id="ahMsg"></div>' +
-        '<div id="ahStage"></div><div id="ahKeys"></div><button type="button" id="ahQuit">Desistir</button><button type="button" id="ahCam">🎥 Câmera</button>';
+        '<div id="ahStage"></div><div id="ahKeys"></div><div id="ahBtns"><button type="button" id="ahQuit">Desistir</button><button type="button" id="ahCam">🎥 Câmera</button></div>';
       document.body.append(hud);
       const t = document.createElement('div'); t.id = 'arrTouch'; t.hidden = true;
       t.innerHTML = '<button type="button" data-a="gd" class="atS">− marcha</button><button type="button" data-a="gu" class="atS atR">marcha +</button>' +
