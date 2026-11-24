@@ -4668,7 +4668,7 @@
         const tint = g.createLinearGradient(0, 0, 0, gh);
         if (night) { tint.addColorStop(0, 'rgba(30,70,150,.10)'); tint.addColorStop(1, 'rgba(255,120,60,.05)') }
         else if (raining) { tint.addColorStop(0, 'rgba(80,120,150,.08)'); tint.addColorStop(1, 'rgba(40,60,70,.06)') }
-        else { tint.addColorStop(0, 'rgba(70,140,200,.07)'); tint.addColorStop(.55, 'rgba(0,0,0,0)'); tint.addColorStop(1, 'rgba(255,165,80,.07)') }
+        else { tint.addColorStop(0, 'rgba(60,130,200,.09)'); tint.addColorStop(.5, 'rgba(0,0,0,0)'); tint.addColorStop(.8, 'rgba(255,170,90,.06)'); tint.addColorStop(1, 'rgba(40,60,90,.10)') }
         g.fillStyle = tint; g.fillRect(0, 0, gw, gh);
         vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, night ? 'rgba(2,6,16,.48)' : 'rgba(6,10,14,.32)');
         g.fillStyle = vig; g.fillRect(0, 0, gw, gh);
@@ -6011,6 +6011,7 @@
         ctx.restore();
         if (cityRoute()) { ctx.save(); ctx.globalCompositeOperation = 'screen'; cityProps(project, origin, true); ctx.restore() }
       }
+      if (dayCinema()) try { dayPass(project, origin, horizon) } catch (e) { }
       if (night && nightCinema()) { nightPass(project, origin, horizon); if (raining) { ctx.fillStyle = 'rgba(38,54,64,.10)'; ctx.fillRect(0, 0, w, h) } }
       else if (night || raining) {
         ctx.fillStyle = night ? (portRoute() ? 'rgba(5,12,28,.29)' : 'rgba(5,12,28,.43)') : 'rgba(38,54,64,.16)';
@@ -11969,6 +11970,71 @@
       if (msg && compact) { t.innerHTML = msg; t.classList.add('on'); UT.at = performance.now() }
       if (!compact || performance.now() - UT.at > 2600) t.classList.remove('on');
     }
+    // ===================== Dia de cinema: neblina de distância, sol, brilho do asfalto e chuva com spray =====================
+    const dayLayer = document.createElement('canvas'); let dayKey = '';
+    const DAY_DBG = { off: false };
+    function dayCinema() { return !night && !DAY_DBG.off && !liteGraphics() }
+    function dayPass(project, origin, horizon) {
+      const city = cityRoute(), hy = Math.round(clamp(horizon, h * .05, h * .8) / 4) * 4;
+      const key = [w, h, hy, dayPhase, raining ? 1 : 0, city ? 1 : 0].join('|');
+      if (key !== dayKey) {
+        dayKey = key; dayLayer.width = Math.max(2, Math.round(w / 4)); dayLayer.height = Math.max(2, Math.round(h / 4));
+        const g = dayLayer.getContext('2d'), gw = dayLayer.width, gh = dayLayer.height, y = hy / 4;
+        g.clearRect(0, 0, gw, gh);
+        // neblina de distância: o que está perto do horizonte fica claro e azulado
+        const col = raining ? '168,178,186' : dayPhase === 'dusk' ? '255,178,128' : dayPhase === 'morning' ? '236,228,214' : '196,214,232';
+        const a = (raining ? .55 : dayPhase === 'dusk' ? .34 : .40) * (city ? .75 : 1);
+        const reach = gh * (raining ? .30 : .20);
+        const hz = g.createLinearGradient(0, y - gh * .10, 0, y + reach);
+        hz.addColorStop(0, 'rgba(' + col + ',0)'); hz.addColorStop(.30, 'rgba(' + col + ',' + a + ')'); hz.addColorStop(.42, 'rgba(' + col + ',' + a * .85 + ')'); hz.addColorStop(1, 'rgba(' + col + ',0)');
+        g.fillStyle = hz; g.fillRect(0, Math.max(0, y - gh * .10), gw, gh * .10 + reach);
+        // brilho do sol no céu (manhã à esquerda, fim de tarde à direita, meio-dia no alto)
+        if (!raining) {
+          const sx = dayPhase === 'morning' ? gw * .18 : dayPhase === 'dusk' ? gw * .82 : gw * .70, sy = dayPhase === 'day' ? y * .25 : y * .72;
+          const sg = g.createRadialGradient(sx, sy, 0, sx, sy, Math.max(gw, gh) * .55);
+          const sc = dayPhase === 'dusk' ? '255,170,90' : dayPhase === 'morning' ? '255,232,190' : '255,248,226';
+          sg.addColorStop(0, 'rgba(' + sc + ',.30)'); sg.addColorStop(.25, 'rgba(' + sc + ',.10)'); sg.addColorStop(1, 'rgba(' + sc + ',0)');
+          g.globalCompositeOperation = 'screen'; g.fillStyle = sg; g.fillRect(0, 0, gw, gh); g.globalCompositeOperation = 'source-over';
+        }
+      }
+      ctx.save(); ctx.imageSmoothingEnabled = true;
+      { // desenha só a faixa que tem efeito (céu + horizonte), não a tela toda
+        const bot = Math.min(h, hy + h * (raining ? .30 : .20)), top = raining ? Math.max(0, hy - h * .10) : 0, sy = top / 4, sh = Math.max(1, (bot - top) / 4);
+        ctx.drawImage(dayLayer, 0, sy, dayLayer.width, Math.min(sh, dayLayer.height - sy), 0, top, w, Math.min(bot - top, h - top));
+      }
+      ctx.globalCompositeOperation = 'screen';
+      // asfalto: brilho ao longe (contra o sol) e miragem de calor ao meio-dia
+      const [mx, my, mk] = project(origin + 150, x, 0), rw = route.width * mk * 1.25;
+      if (mk > 0 && my > hy - 4 && !raining) {
+        const glare = dayPhase === 'day' ? .22 : .30, shim = .8 + .2 * Math.sin(elapsed * 7.3) * Math.sin(elapsed * 2.1);
+        ctx.save(); ctx.translate(mx, my); ctx.scale(1, .16);
+        const gg = ctx.createRadialGradient(0, 0, 0, 0, 0, rw);
+        const gc = dayPhase === 'dusk' ? '255,190,130' : '225,236,248';
+        gg.addColorStop(0, 'rgba(' + gc + ',' + glare * shim + ')'); gg.addColorStop(1, 'rgba(' + gc + ',0)');
+        ctx.fillStyle = gg; ctx.fillRect(-rw, -rw, rw * 2, rw * 2); ctx.restore();
+        if (dayPhase === 'day' && !city) { // miragem: faixa tremendo refletindo o céu
+          const [, ny, nk] = project(origin + 190, x, 0), ww = route.width * nk * 1.1;
+          for (let i = 0; i < 3; i++) { const yy = ny + i * Math.max(1, nk * .35), wob = Math.sin(elapsed * 9 + i * 1.7) * nk * .4; ctx.fillStyle = 'rgba(190,215,240,' + (.16 - i * .04) + ')'; ctx.fillRect(mx - ww + wob, yy, ww * 2, Math.max(1, nk * .25)) }
+        }
+      }
+      // chuva: asfalto molhado refletindo o céu e spray levantado pelos carros da frente
+      if (raining) {
+        const [, ry, rk] = project(origin + 60, x, 0); if (rk > 0) { const sh = ctx.createLinearGradient(0, hy, 0, ry); sh.addColorStop(0, 'rgba(200,214,226,.16)'); sh.addColorStop(1, 'rgba(200,214,226,0)'); ctx.fillStyle = sh; ctx.fillRect(0, hy, w, Math.max(0, ry - hy)) }
+        ctx.globalCompositeOperation = 'source-over';
+        for (const car of traffic) {
+          if (car.direction < 0) continue; const back = car.s - car.type.half, d = back - origin;
+          if (d < 3 || d > 110 || (car.currentSpeed ?? car.type.speed) < 4) continue;
+          for (const sd of car.type.motorcycle || car.type.sprite === 'touring' ? [0] : [-1, 1]) {
+            const [px, py, k] = project(back - .6, car.lane + sd * car.type.width * .36, .3); if (k < .4) continue;
+            const r = k * (.9 + .25 * Math.sin(elapsed * 13 + car.s)), sp = ctx.createRadialGradient(px, py, 0, px, py, r);
+            sp.addColorStop(0, 'rgba(215,222,228,.34)'); sp.addColorStop(1, 'rgba(215,222,228,0)');
+            ctx.fillStyle = sp; ctx.fillRect(px - r, py - r, r * 2, r * 2);
+          }
+        }
+      }
+      ctx.restore();
+    }
+    window.DAY = DAY_DBG;
 
     requestAnimationFrame(frame);
 
