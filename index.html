@@ -2139,6 +2139,7 @@
         s: grid[n][0], lane: grid[n][1], aim: grid[n][1], direction: 1, speed: 0, target: (roster[ri].target + champBoost()) * diff().rival,
         style: roster[ri].style || styles[(n + route.kind) % 3], driver: roster[ri].driver, lines: roster[ri].lines, nitro: 1, boost: 0, mistake: 0, talkAt: -99 }));
       if (bossActive) rivals = [bossRival(wLane)];
+      try { for (let k = 0; k < 3; k++) noGhost(0, true) } catch (e) { }
       try { const r0 = rivalMemory() || rivals[Math.floor(Math.random() * rivals.length)]; rivalSay(r0, 'start', true) } catch (e) { }
       position = rivals.length + 1; startCountdown = 3; drafting = false; lastPosition = position;
     }
@@ -2178,8 +2179,9 @@
         if (rival.mistake <= 0 && rival.style === 'arriscado' && corner > .012 && Math.random() < dt * .18) { rival.mistake = 1.4; if (Math.abs(rival.s - z) < 40) rivalSay(rival, 'mistake') }
         if (rival.mistake > 0) { rival.mistake -= dt; target *= .72 }
         // fila: se outro carro (rival ou você) está logo à frente na mesma faixa, acompanha em vez de atravessar
-        const ahead = [...rivals.filter(o => o !== rival && o.finish === undefined).map(o => ({ s: o.s, lane: o.lane, speed: o.speed })), { s: z, lane: x, speed: v }]
-          .filter(o => o.s > rival.s && o.s - rival.s < 7.5 && Math.abs(o.lane - rival.lane) < 1.95);
+        const ahead = [...rivals.filter(o => o !== rival && o.finish === undefined).map(o => ({ s: o.s, lane: o.lane, speed: o.speed })), { s: z, lane: x, speed: v },
+          ...traffic.filter(c => c.direction > 0).map(c => ({ s: c.s - (c.type.half || 2) + 2.15, lane: c.lane ?? 0, speed: c.currentSpeed ?? c.type.speed, wide: (c.type.width || 1.8) / 2 + .95 }))]
+          .filter(o => o.s > rival.s && o.s - rival.s < (o.wide ? 11 : 7.5) && Math.abs(o.lane - rival.lane) < (o.wide || 1.95));
         if (ahead.length) {
           const lead = ahead.sort((a, b) => a.s - b.s)[0];
           target = Math.min(target, lead.speed * (lead.s - rival.s < 4.6 ? .9 : 1));
@@ -2545,7 +2547,7 @@
       if (urban) updateUrbanLaneChanges(dt);
       const movingTraffic = queuedTraffic ? [...traffic].sort((a, b) => b.s - a.s) : traffic;
       for (const [index, car] of movingTraffic.entries()) {
-        let stopAt = Infinity, approachSpeed = car.type.speed * (car.surprise > 0 ? .3 : 1);
+        let stopAt = Infinity, approachSpeed = Math.min(car.type.speed * (car.surprise > 0 ? .3 : 1), car.capSpeed ?? Infinity);
         if (queuedTraffic && car.direction > 0) {
           const signal = urban ? checks.find(c => c.kind === 'signal' && c.s > car.s) : null;
           if (signal && signalAt(elapsed, signal.s) !== 'green' && car.s + car.type.half < signal.s) {
@@ -5370,6 +5372,7 @@
         }
         amb.s += (blocked ? Math.min(speedAmb, v) : speedAmb) * dt;
         if (ambAim != null) amb.lane += clamp(ambAim - amb.lane, -3 * dt, 3 * dt);
+        try { noGhost(0) } catch (e) { }
         if (gap > 0 && gap < 45 && !amb.warned) { amb.warned = true; roadNote = '🚑 Ambulância atrás! Dê passagem (vá para o lado)'; roadNoteTime = 3.2; showBonus() }
         // a ambulância escolhe a faixa livre; se você está no meio do caminho, ela espera
         // vem atrás de você na sua faixa; perto, mantém a faixa e espera você abrir caminho
@@ -8673,6 +8676,7 @@
       if (duel && drafting) st.draft = (st.draft || 0) + dt;
       if (duel) { updateDuel(dt); if (streetMode()) { updateChallenges(dt, previousZ); streetTick(dt) } } else updateChallenges(dt, previousZ);
       try { npcTick(dt) } catch (e) { }
+      try { noGhost(dt) } catch (e) { }
       if (cop) { try { updateChase(dt) } catch (e) { } if (mode !== 'race') return; }
       try { updateTollGate(dt) } catch (e) { }
       try { updateRaceEvents(dt) } catch (e) { }
@@ -11725,6 +11729,54 @@
       }
       ctx.restore();
     }
+    // ---- 3. Nenhum veículo atravessa outro: trânsito, rivais e ambulância ----
+    const NG = { fixes: 0 };
+    function ghostBodies() {
+      const B = [];
+      for (const c of traffic) B.push({ o: c, k: 't', s: c.s, half: c.type.half || 2, w: c.type.width || 1.8, lane: c.lane ?? 0, dir: c.direction || 1, sp: c.currentSpeed ?? c.type.speed });
+      for (const r of rivals) if (r.finish === undefined) B.push({ o: r, k: 'r', s: r.s, half: 2.15, w: (r.type && r.type.width) || 1.8, lane: r.lane, dir: 1, sp: r.speed });
+      if (typeof amb !== 'undefined' && amb && amb.type) B.push({ o: amb, k: 'a', s: amb.s, half: amb.type.half || 2.6, w: amb.type.width || 2, lane: amb.lane, dir: 1, sp: 20 });
+      return B;
+    }
+    function noGhost(dt, force) {
+      if (!force && mode !== 'race' && mode !== 'pause') return;
+      const B = ghostBodies(), n = B.length; if (n < 2) return;
+      const W = s => Math.max(1.5, roadWidthAt(s) - .9);
+      const setLane = (b, lane) => { lane = clamp(lane, -W(b.s), W(b.s)); b.lane = lane; if (b.k === 'r') { b.o.lane = lane; b.o.aim = lane } else b.o.lane = lane };
+      const setS = (b, s) => { if (dt > 0 && Math.abs(s - b.s) > .8 && (NG.log = NG.log || []).length < 40) NG.log.push([route.name.slice(0,12), b.k, (b.o.type && (b.o.type.sprite||b.o.type.label)) || '', Math.round(b.s - z), +(s - b.s).toFixed(2), +b.lane.toFixed(1)]); b.s = s; b.o.s = s };
+      const capSp = (b, sp) => { if (b.k === 't') { b.o.capSpeed = Math.min(b.o.capSpeed ?? Infinity, sp); b.o.currentSpeed = Math.min(b.o.currentSpeed ?? sp, sp) } else if (b.k === 'r') b.o.speed = Math.min(b.o.speed, sp) };
+      // 3a. prevenção: quem vem atrás e mais rápido na mesma faixa desacelera antes (ou ultrapassa pela outra faixa)
+      for (const b of B) if (b.k === 't') b.o.capSpeed = undefined;
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        if (i === j) continue; const f = B[i], l = B[j];
+        if (f.k === 'a' || f.dir !== l.dir) continue;
+        const gap = (l.s - f.s) * f.dir - l.half - f.half; if (gap < -1 || gap > (f.k === 'r' ? 10 : 16)) continue;
+        if (Math.abs(f.lane - l.lane) > (f.w + l.w) / 2 + .25) continue;
+        capSp(f, Math.max(0, l.sp - (gap < 4 ? 1.5 : 0)));
+      }
+      // 3b. garantia: se dois veículos estiverem se sobrepondo, separa (de lado se estão lado a lado, senão quem vem atrás recua)
+      for (let pass = 0; pass < 2; pass++) for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+        const a = B[i], b = B[j];
+        const needLat = (a.w + b.w) / 2 + .12, latD = b.lane - a.lane;
+        if (Math.abs(latD) >= needLat) continue;
+        const needLong = a.half + b.half + .5, ds = b.s - a.s;
+        if (Math.abs(ds) >= needLong) continue;
+        NG.fixes++;
+        const latOver = needLat - Math.abs(latD);
+        if (a.dir !== b.dir || Math.abs(ds) < (a.half + b.half) * .55 || latOver < 1.1) {
+          // lado a lado (ou de frente): abre espaço para os lados
+          const push = (needLat - Math.abs(latD)) / 2 + .02, sg = latD >= 0 ? 1 : -1;
+          setLane(a, a.lane - sg * push); setLane(b, b.lane + sg * push);
+          if (Math.abs(b.lane - a.lane) < needLat - .05) { // sem espaço lateral: o de trás recua
+            const [f, l] = (ds * a.dir >= 0) ? [a, b] : [b, a]; if (f.dir === l.dir) { setS(f, l.s - f.dir * needLong); capSp(f, l.sp) }
+          }
+        } else {
+          const [f, l] = (ds * a.dir >= 0) ? [a, b] : [b, a];
+          const tgt = l.s - f.dir * needLong; setS(f, dt > 0 ? f.s + clamp(tgt - f.s, -1.6, 1.6) : tgt); capSp(f, l.sp * .85);
+        }
+      }
+    }
+    window.NOGHOST = NG;
 
     // ===================== Visual do carro (neon e chama) · Narrador · Dono da pista =====================
     // ---------- Visual: neon embaixo do carro e chama no escapamento ----------
