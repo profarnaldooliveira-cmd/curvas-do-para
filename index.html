@@ -12165,6 +12165,10 @@
           sg.addColorStop(0, 'rgba(' + sc + ',.30)'); sg.addColorStop(.25, 'rgba(' + sc + ',.10)'); sg.addColorStop(1, 'rgba(' + sc + ',0)');
           g.globalCompositeOperation = 'screen'; g.fillStyle = sg; g.fillRect(0, 0, gw, gh); g.globalCompositeOperation = 'source-over';
         }
+        // tudo some suavemente antes do fim da faixa desenhada (sem linha reta cortando a grama)
+        const fade = g.createLinearGradient(0, y + reach * .35, 0, y + reach * .97);
+        fade.addColorStop(0, 'rgba(0,0,0,1)'); fade.addColorStop(1, 'rgba(0,0,0,0)');
+        g.globalCompositeOperation = 'destination-in'; g.fillStyle = fade; g.fillRect(0, 0, gw, gh); g.globalCompositeOperation = 'source-over';
       }
       ctx.save(); ctx.imageSmoothingEnabled = true;
       { // desenha só a faixa que tem efeito (céu + horizonte), não a tela toda
