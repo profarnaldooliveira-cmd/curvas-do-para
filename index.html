@@ -1297,6 +1297,22 @@
       #gate .gtCard { width: min(380px, 52vw); max-height: none }
       #gate .gtFoot { width: 100% }
     }
+    /* ---------- missões com atalho / menu Mais / dica da 1ª corrida ---------- */
+    .msRow.canGo { display: grid; grid-template-columns: 1fr auto; column-gap: 10px; align-items: center }
+    .msRow.canGo > b, .msRow.canGo > small, .msRow.canGo > .msBar { grid-column: 1 }
+    .msRow .msGo { grid-column: 2; grid-row: 1 / span 3; align-self: center; border: 0; border-radius: 11px; padding: 10px 12px; min-height: 44px; background: linear-gradient(90deg, #d8ff6a, #9fe870); color: #10200a; font: 900 .9rem system-ui, sans-serif; cursor: pointer; white-space: nowrap }
+    @media (max-width: 380px) { .msRow.canGo { grid-template-columns: 1fr } .msRow .msGo { grid-column: 1; grid-row: auto; margin-top: 8px; width: 100% } }
+    #xMore { display: contents }
+    #xMoreList { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border-radius: 14px; background: #ffffff08; border: 1px dashed #ffffff26 }
+    #xMoreList[hidden] { display: none }
+    #firstHint { position: fixed; z-index: 60; left: 50%; top: 34%; transform: translateX(-50%); width: min(420px, calc(100vw - 32px)); box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; text-align: center; padding: 12px 16px; border-radius: 16px; background: #0b1410e6; border: 1px solid #d6ff6066; color: #eef4ee; font: 500 14px system-ui, sans-serif; box-shadow: 0 12px 40px #000a; transition: opacity .4s; cursor: pointer }
+    #firstHint b { color: #d6ff60 } #firstHint > b { font-size: 15px } #firstHint small { opacity: .75; font-size: 12px }
+    #firstHint.out { opacity: 0 }
+    body.paused #firstHint { display: none }
+    #finishBar { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 6px }
+    #finishBar[hidden] { display: none }
+    #finishBar button { flex: 1 1 auto; min-height: 44px; padding: 10px 14px; border-radius: 12px; border: 1px solid #ffffff2e; background: #ffffff12; color: #eef4ee; font: 800 .95rem system-ui, sans-serif; cursor: pointer }
+    #finishBar .fbMain { flex-basis: 100%; border: 0; background: linear-gradient(90deg, #d8ff6a, #9fe870); color: #10200a; font-size: 1.05rem }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -2863,7 +2879,7 @@
       box.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close() } });
     }
     $('openTutorial').onclick = () => showTutorial();
-    setTimeout(() => { try { if (!localStorage.getItem('pista-studio-tutorial-v1') && mode === 'menu') showTutorial() } catch (e) { } }, 600);
+    setTimeout(() => { try { if (!localStorage.getItem('pista-studio-tutorial-v1') && mode === 'menu' && !document.getElementById('quickStart') && !document.getElementById('gate')) showTutorial() } catch (e) { } }, 600);
     function showCareer() {
       refreshGarageLocks(); try { renderAchievements() } catch (e) { }
       setTimeout(() => { try { applyMenuTabs() } catch (e) { } }, 0);
@@ -12523,6 +12539,98 @@
     setTimeout(() => { try { showGate() } catch (e) { } }, 30);
     // logo no topo do menu quando o título é o nome do jogo (nos resultados o título muda e a logo some)
     setInterval(() => { try { const t = $('title'), i = $('menuLogo'); if (!t || !i) return; const on = t.textContent.replace(/\s+/g, ' ').trim() === 'Curvas do Pará'; i.hidden = !on; t.classList.toggle('srOnly', on) } catch (e) { } }, 400);
+
+    // ===================== Experiência do jogador: missões com atalho, menu enxuto, primeira corrida =====================
+    // ---------- missão: "Ir agora" já prepara tudo e larga ----------
+    function msSetMode(v) { const gm = $('gameMode'); if (gm.value !== v) { gm.value = v; gm.dispatchEvent(new Event('change')) } }
+    function msSafeCar() { const c = $('car'); if (!carOwned(c.selectedIndex)) { c.selectedIndex = 0; c.dispatchEvent(new Event('change')) } }
+    function msGo(i) {
+      const o = msEnsure().list[i]; if (!o || o.done || mode !== 'menu') return;
+      document.querySelectorAll('#missionsModal,.xModal').forEach(e => e.remove());
+      try { $('quickStart')?.remove() } catch (e) { }
+      if (o.t === 'drag_win' || o.t === 'drag_runs') { openArrancada(); return }
+      const plain = ['chase', 'delivery', 'daily', 'champ'];
+      if (o.t === 'escape') msSetMode('chase');
+      else if (o.t === 'delivery') msSetMode('delivery');
+      else if (plain.includes($('gameMode').value)) msSetMode('free');
+      if (o.t === 'route') { const r = $('route'); if (r.selectedIndex !== o.r) { r.selectedIndex = o.r; r.dispatchEvent(new Event('change')) } }
+      if (o.t === 'car' && carOwned(o.c)) { const c = $('car'); if (c.selectedIndex !== o.c) { c.selectedIndex = o.c; c.dispatchEvent(new Event('change')) } }
+      else msSafeCar();
+      if (!routeOwned($('route').selectedIndex) && !fixedRouteMode()) { const r = $('route'); r.selectedIndex = 1; r.dispatchEvent(new Event('change')) }
+      setTimeout(() => { try { $('start').click() } catch (e) { } }, 60);
+    }
+    // acrescenta o botão em cada missão aberta (sem mexer no resto da janela)
+    const _openMissions = openMissions;
+    openMissions = function () {
+      _openMissions();
+      const el = $('missionsModal'); if (!el) return;
+      const list = msEnsure().list;
+      el.querySelectorAll('.msRow').forEach((row, i) => {
+        const o = list[i]; if (!o || o.done) return;
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'msGo'; b.dataset.go = i;
+        b.textContent = (o.t === 'drag_win' || o.t === 'drag_runs') ? '▶ Abrir Arrancada' : '▶ Ir agora';
+        row.append(b); row.classList.add('canGo');
+        const sm = row.querySelector('small'), prog = o.goal > 1 ? ' · ' + o.prog + '/' + o.goal : '';
+        const tip = { route: 'Já escolhe a estrada e larga', car: carOwned(o.c) ? 'Já escolhe o carro e larga' : 'Compre este carro na garagem primeiro', clean: 'Larga na estrada escolhida · vale até a bandeirada', escape: 'Já abre o modo Fuga e larga', delivery: 'Já abre a entrega no Mercado da Baía', drag_win: 'Abre a Arrancada Guamá · vença um duelo', drag_runs: 'Abre a Arrancada Guamá' }[o.t];
+        if (sm && tip) sm.textContent = tip + prog;
+      });
+      el.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) msGo(+b.dataset.go) });
+    };
+    try { $('missionsOpen').onclick = openMissions } catch (e) { }
+    // ---------- menu: opções secundárias num botão "Mais" ----------
+    function uxMoreMenu() {
+      const bar = $('xBar'); if (!bar) return;
+      let wrap = $('xMore');
+      if (!wrap) {
+        wrap = document.createElement('div'); wrap.id = 'xMore';
+        wrap.innerHTML = '<button type="button" id="xMoreBtn" aria-expanded="false" aria-controls="xMoreList">⚙️ Mais opções</button><div id="xMoreList" hidden></div>';
+        bar.append(wrap);
+        const btn = wrap.querySelector('#xMoreBtn'), list = wrap.querySelector('#xMoreList');
+        btn.onclick = () => { const open = list.hidden; list.hidden = !open; btn.setAttribute('aria-expanded', String(open)); btn.textContent = open ? '⚙️ Menos opções' : '⚙️ Mais opções' };
+      }
+      const list = $('xMoreList');
+      for (const id of ['narBtn', 'ghostToggle', 'saveOpen', 'feedbackOpen']) { const b = $(id); if (b && b.parentElement !== list) list.append(b) }
+      bar.append(wrap);
+    }
+    for (const t of [100, 700, 1700, 3000]) setTimeout(() => { try { uxMoreMenu() } catch (e) { } }, t);
+    // ---------- primeira corrida: dica rápida dos controles (sem travar a tela) ----------
+    function uxFirstHint() {
+      let seen = false; try { seen = localStorage.getItem('pista-studio-hint-v1') === '1' } catch (e) { }
+      if (seen) return;
+      try { localStorage.setItem('pista-studio-hint-v1', '1') } catch (e) { }
+      const touch = touchDevice || (navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches);
+      const el = document.createElement('div'); el.id = 'firstHint'; el.setAttribute('role', 'status');
+      el.innerHTML = touch
+        ? '<b>Como dirigir</b><span>◀ ▶ à esquerda viram · <b>Acelerar</b> e <b>Frear</b> à direita</span><small>Câmera e pausa ficam no topo · toque para fechar</small>'
+        : '<b>Como dirigir</b><span><b>↑/W</b> acelera · <b>↓/S</b> freia · <b>← →</b> viram</span><small><b>C</b> troca a câmera · <b>Esc</b> pausa · <b>Espaço</b> nitro</small>';
+      document.body.append(el);
+      const bye = () => { el.classList.add('out'); setTimeout(() => el.remove(), 400) };
+      el.onclick = bye; setTimeout(bye, 7000);
+    }
+    $('start').addEventListener('click', () => setTimeout(() => { try { if (mode === 'race') uxFirstHint() } catch (e) { } }, 300));
+    // o tutorial nunca fica por cima de uma corrida em andamento
+    setInterval(() => { try { if ((mode === 'race' || mode === 'drag') && $('tutorial')) $('tutorial').remove() } catch (e) { } }, 300);
+    // ---------- depois da bandeirada: ações principais no topo (sem precisar rolar até "Largar") ----------
+    function uxFinishBar() {
+      let bar = $('finishBar');
+      const show = mode === 'finish' && !$('menu').hidden;
+      if (!show) { if (bar) bar.hidden = true; return }
+      if (!bar) {
+        bar = document.createElement('div'); bar.id = 'finishBar';
+        $('intro').after(bar);
+        bar.addEventListener('click', e => {
+          const a = e.target.closest('[data-f]')?.dataset.f; if (!a) return;
+          if (a === 'again') $('start').click();
+          else if (a === 'ms') openMissions();
+          else if (a === 'home') $('homeOpen')?.click();
+        });
+      }
+      const left = (() => { try { return msEnsure().list.filter(o => !o.done).length } catch (e) { return 0 } })();
+      const html = '<button type="button" data-f="again" class="fbMain">↻ Correr de novo</button>' + (left ? '<button type="button" data-f="ms">🎯 Missões · faltam ' + left + '</button>' : '') + '<button type="button" data-f="home">🏠 Tela inicial</button>';
+      if (bar.dataset.h !== html) { bar.innerHTML = html; bar.dataset.h = html }
+      bar.hidden = false;
+    }
+    setInterval(() => { try { uxFinishBar(); if (mode !== 'race' && $('firstHint')) $('firstHint').remove() } catch (e) { } }, 400);
 
     requestAnimationFrame(frame);
 
