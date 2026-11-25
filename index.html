@@ -1206,6 +1206,36 @@
     #miniToast b { color: #d6ff60; font-size: .95rem }
     #miniToast.on { opacity: 1; transform: none }
     body:not(.inRace) #miniToast { display: none }
+    /* conta e ranking */
+    .accCard { max-height: min(88vh, 760px); overflow-y: auto }
+    .accCard h2 { margin: 4px 0 6px }
+    .accGoogle { width: 100%; padding: 11px; border-radius: 12px; border: 1px solid #ffffff40; background: #fff; color: #1f1f1f; font: 700 .95rem system-ui; cursor: pointer; margin-top: 8px }
+    .accGoogle b { color: #4285f4; margin-right: 6px }
+    .accOr { text-align: center; font-size: .78rem; color: #9fb09a; margin: 10px 0 6px }
+    .accTabs { display: flex; gap: 6px; margin-bottom: 8px }
+    .accTabs button { flex: 1; padding: 8px; border-radius: 10px; border: 1px solid #ffffff2e; background: #ffffff0d; color: #fff; font-weight: 700; cursor: pointer }
+    .accTabs button.on { border-color: #d6ff60; color: #d6ff60 }
+    .accF { display: block; font-size: .8rem; color: #b9c6b2; margin: 8px 0 }
+    .accF input, .accF select { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 10px; border-radius: 10px; border: 1px solid #ffffff33; background: #0b1211; color: #eef4ee; font: 16px system-ui }
+    .accMsg { min-height: 1.2em; font-size: .85rem; margin: 6px 0 }
+    .accRow { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 }
+    .accRow button { flex: 1 1 auto; padding: 10px 12px; border-radius: 10px; border: 1px solid #ffffff33; background: #ffffff10; color: #fff; font-weight: 700; cursor: pointer }
+    .accRow .accMain { background: #d6ff60; color: #10140c; border-color: #d6ff60 }
+    .accRow .accLink { background: none; border: none; color: #9fd0ff; text-decoration: underline; flex: 0 0 auto }
+    .accRow .accDanger { border-color: #ff7a6a80; color: #ff9a8a }
+    .accAv { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 4px }
+    .accAv button { font-size: 1.4rem; padding: 6px 0; border-radius: 10px; border: 1px solid #ffffff22; background: #ffffff0a; cursor: pointer }
+    .accAv button.on { border-color: #d6ff60; background: #d6ff6022 }
+    .accPriv { margin-top: 10px; font-size: .78rem; color: #aab7a4 } .accPriv summary { cursor: pointer; color: #cfe0c8 }
+    .rankList { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 4px }
+    .rankList li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: #ffffff0a }
+    .rankList li.me { background: #d6ff6022; outline: 1px solid #d6ff6066 }
+    .rankList li b { width: 1.6em; text-align: center; color: #d6ff60 }
+    .rankList li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+    .rankList li small { color: #9fb09a } .rankList .rkCar { display: block; font-size: .72rem }
+    .rankList li em { font-style: normal; font-variant-numeric: tabular-nums; font-weight: 800 }
+    .accToast { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 120; background: #0e1612ee; color: #eef4ee; border: 1px solid #d6ff6066; border-radius: 12px; padding: 9px 14px; font: 600 .86rem system-ui; pointer-events: none }
+    #accOpen { border-color: #d6ff6080 !important }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -8705,6 +8735,7 @@
           const id = (duel ? 'pista-studio-duel-time:' : careerRun ? 'pista-studio-career-time:' : 'pista-studio-regional:') + [$('route').selectedIndex, model, gear, tire, ...(engine === 'original' && brakes === 'original' ? [] : [engine, brakes])].join(':'); record = Number(localStorage.getItem(id)) || 0;
           if (!record || elapsed < record) { record = elapsed; localStorage.setItem(id, String(record)) }
         } catch { }
+        if (!(cop && !cop.over)) try { accScore(elapsed) } catch (e) { }
         if (cop && !cop.over) { escaped(); return }
         // Pagamento de toda corrida terminada (antes só medalhas novas pagavam): distância + direção limpa + pontos + posição.
         const finalPts = Math.floor(points) + bonus;
@@ -12087,6 +12118,236 @@
       ctx.restore();
     }
     window.DAY = DAY_DBG;
+
+    // ===================== Conta do jogador (Firebase): login, perfil, progresso na nuvem e ranking =====================
+    const FB_CFG = { apiKey: 'AIzaSyCO1LYEE0M972alleRuux1wSR0TEgBTPek', authDomain: 'curvas-do-para.firebaseapp.com', projectId: 'curvas-do-para', storageBucket: 'curvas-do-para.firebasestorage.app', messagingSenderId: '1071912294608', appId: '1:1071912294608:web:95706e1234b6d6b24426d5' };
+    const FBV = '10.12.2', FB_BASE = 'https://www.gstatic.com/firebasejs/' + FBV + '/';
+    const ACC = { ready: false, failed: false, user: null, profile: null, lastUp: '', busy: false, A: null, F: null, auth: null, db: null };
+    const AVATARS = ['🏎️', '🚗', '🚙', '🛻', '🏍️', '🚕', '🚓', '🚑', '🦜', '🐆', '🌴', '🔥'];
+    const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    function accAllowed() { try { return /^https?:$/.test(location.protocol) && !/claude\.ai$|claudeusercontent\.com$|claudemcpcontent\.com$/.test(location.hostname) } catch (e) { return false } }
+    async function accInit() {
+      if (ACC.ready || ACC.failed || ACC.loading) return ACC.ready;
+      if (!accAllowed()) { ACC.failed = true; return false }
+      ACC.loading = true;
+      try {
+        const [appM, authM, fsM] = await Promise.all([import(FB_BASE + 'firebase-app.js'), import(FB_BASE + 'firebase-auth.js'), import(FB_BASE + 'firebase-firestore.js')]);
+        const app = appM.initializeApp(FB_CFG);
+        ACC.A = authM; ACC.F = fsM; ACC.auth = authM.getAuth(app); ACC.db = fsM.getFirestore(app);
+        try { ACC.auth.languageCode = 'pt' } catch (e) { }
+        authM.onAuthStateChanged(ACC.auth, u => { ACC.user = u; accOnUser(u) });
+        ACC.ready = true;
+      } catch (e) { ACC.failed = true; console.warn('Conta indisponível', e) }
+      ACC.loading = false; accButton();
+      return ACC.ready;
+    }
+    // ---------- botão no menu ----------
+    function accButton() {
+      const bar = $('xBar'); if (!bar) return;
+      let b = $('accOpen'), r = $('rankOpen');
+      if (ACC.failed) { b?.remove(); r?.remove(); return }
+      if (!b) { b = document.createElement('button'); b.type = 'button'; b.id = 'accOpen'; b.onclick = openAccount; bar.prepend(b) }
+      if (!r) { r = document.createElement('button'); r.type = 'button'; r.id = 'rankOpen'; r.textContent = '🏆 Ranking online'; r.onclick = () => openRanking(); b.after(r) }
+      b.textContent = ACC.user ? (ACC.profile?.avatar || '👤') + ' ' + (ACC.profile?.nick || 'Minha conta') : '👤 Entrar / Criar conta';
+    }
+    function accModal(id, html) {
+      document.getElementById(id)?.remove();
+      const el = document.createElement('div'); el.id = id; el.className = 'xModal';
+      el.innerHTML = '<div class="xCard accCard"><button type="button" class="xClose" aria-label="Fechar">✕</button>' + html + '</div>';
+      document.body.append(el);
+      el.addEventListener('click', e => { if (e.target === el || e.target.closest('.xClose')) el.remove() });
+      return el;
+    }
+    const accMsg = (el, t, ok) => { const m = el.querySelector('[data-msg]'); if (m) { m.textContent = t; m.style.color = ok ? '#7fe0a6' : '#ffb37a' } };
+    const PRIV = '<details class="accPriv"><summary>Privacidade (LGPD)</summary><p>Guardamos só o necessário para o jogo: seu e-mail (para entrar), o apelido, avatar, cidade e carro favorito que você escolher, seu progresso e seus melhores tempos. O apelido, avatar, cidade e tempos aparecem no ranking público; o e-mail nunca aparece. Não vendemos nem compartilhamos seus dados. Você pode apagar a conta e todos os dados a qualquer momento em “Minha conta → Excluir conta”. Dúvidas: fale com o criador do jogo, Arnaldo Henrique de Oliveira Júnior, pelo botão “Enviar sugestão”.</p></details>';
+    function errPt(e) {
+      const c = String(e && (e.code || e.message) || '');
+      if (/invalid-credential|wrong-password|user-not-found|invalid-login/.test(c)) return 'E-mail ou senha incorretos.';
+      if (/email-already-in-use/.test(c)) return 'Esse e-mail já tem conta. Use “Entrar”.';
+      if (/weak-password/.test(c)) return 'Senha fraca: use pelo menos 6 caracteres.';
+      if (/invalid-email/.test(c)) return 'E-mail inválido.';
+      if (/popup-blocked/.test(c)) return 'O navegador bloqueou a janela do Google. Libere pop-ups e tente de novo.';
+      if (/popup-closed|cancelled-popup/.test(c)) return 'Janela do Google fechada antes de terminar.';
+      if (/network/.test(c)) return 'Sem internet no momento. Tente de novo.';
+      if (/too-many-requests/.test(c)) return 'Muitas tentativas. Espere um pouco e tente de novo.';
+      if (/requires-recent-login/.test(c)) return 'Por segurança, saia e entre de novo antes de excluir a conta.';
+      return 'Não deu certo agora (' + c.replace(/^auth\//, '') + ').';
+    }
+    async function openAccount() {
+      if (!ACC.ready) { const ok = await accInit(); if (!ok) { alertBox('A conta online funciona no site do jogo (não neste arquivo/visualização).'); return } }
+      if (ACC.user) return openProfile();
+      const el = accModal('accModal', '<div class="xTag">👤 CONTA</div><h2>Entrar no Curvas do Pará</h2>' +
+        '<p class="xSmall">Com uma conta seu progresso fica salvo na nuvem (jogue em qualquer aparelho) e seus tempos entram no ranking. Jogar sem conta continua valendo.</p>' +
+        '<button type="button" class="accGoogle" data-a="google"><b>G</b> Entrar com Google</button>' +
+        '<div class="accOr">ou com e-mail</div>' +
+        '<div class="accTabs"><button type="button" data-tab="in" class="on">Entrar</button><button type="button" data-tab="up">Criar conta</button></div>' +
+        '<label class="accF accNick" hidden>Apelido no jogo<input data-k="nick" maxlength="20" placeholder="ex.: Piloto do Guamá" autocomplete="nickname"></label>' +
+        '<label class="accF">E-mail<input data-k="email" type="email" autocomplete="email" inputmode="email"></label>' +
+        '<label class="accF">Senha<input data-k="pass" type="password" autocomplete="current-password" minlength="6" placeholder="mínimo 6 caracteres"></label>' +
+        '<p data-msg class="accMsg"></p>' +
+        '<div class="accRow"><button type="button" class="accMain" data-a="go">Entrar</button><button type="button" class="accLink" data-a="reset">Esqueci a senha</button></div>' + PRIV);
+      let tab = 'in';
+      const q = s => el.querySelector(s), val = k => q('[data-k="' + k + '"]').value.trim();
+      el.addEventListener('click', async e => {
+        const t = e.target.closest('[data-tab]');
+        if (t) { tab = t.dataset.tab; el.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b === t)); q('.accNick').hidden = tab !== 'up'; q('[data-a="go"]').textContent = tab === 'up' ? 'Criar conta' : 'Entrar'; q('[data-k="pass"]').autocomplete = tab === 'up' ? 'new-password' : 'current-password'; return }
+        const a = e.target.closest('[data-a]')?.dataset.a; if (!a || ACC.busy) return;
+        const { A } = ACC; ACC.busy = true;
+        try {
+          if (a === 'google') { accMsg(el, 'Abrindo o Google…', true); await A.signInWithPopup(ACC.auth, new A.GoogleAuthProvider()); el.remove() }
+          else if (a === 'reset') { if (!val('email')) throw { code: 'invalid-email' }; await A.sendPasswordResetEmail(ACC.auth, val('email')); accMsg(el, 'Enviamos um e-mail para criar uma nova senha. Veja também o spam.', true) }
+          else if (a === 'go') {
+            if (tab === 'up') {
+              const nick = val('nick'); if (nick.length < 2) { accMsg(el, 'Escolha um apelido com pelo menos 2 letras.'); ACC.busy = false; return }
+              ACC.pendingNick = nick;
+              await A.createUserWithEmailAndPassword(ACC.auth, val('email'), q('[data-k="pass"]').value);
+            } else await A.signInWithEmailAndPassword(ACC.auth, val('email'), q('[data-k="pass"]').value);
+            el.remove();
+          }
+        } catch (er) { accMsg(el, errPt(er)) }
+        ACC.busy = false;
+      });
+    }
+    function alertBox(t) { accModal('accAlert', '<div class="xTag">👤 CONTA</div><p>' + escH(t) + '</p>') }
+    // ---------- perfil ----------
+    async function loadProfile(u) {
+      const { F } = ACC; let p = null;
+      try { const s = await F.getDoc(F.doc(ACC.db, 'profiles', u.uid)); if (s.exists()) p = s.data() } catch (e) { }
+      if (!p) {
+        let nick = ACC.pendingNick || (u.displayName || '').split(' ')[0] || localStorage.getItem('pista-studio-nome') || 'Piloto';
+        nick = nick.slice(0, 20); if (nick.length < 2) nick = 'Piloto';
+        p = { nick, avatar: '🏎️', city: '', favCar: '', level: 1, updatedAt: Date.now() };
+        await saveProfile(p);
+      }
+      ACC.pendingNick = null; ACC.profile = p; accButton(); return p;
+    }
+    async function saveProfile(p) {
+      const { F } = ACC; let lv = 1; try { lv = pilotLevel() } catch (e) { }
+      const data = { nick: String(p.nick).slice(0, 20), avatar: String(p.avatar || '🏎️').slice(0, 8), city: String(p.city || '').slice(0, 40), favCar: String(p.favCar || '').slice(0, 40), level: lv, updatedAt: Date.now() };
+      await F.setDoc(F.doc(ACC.db, 'profiles', ACC.user.uid), data); ACC.profile = data; accButton(); return data;
+    }
+    function openProfile() {
+      const p = ACC.profile || {}, cars = [...($('car')?.options || [])].map(o => o.text);
+      const el = accModal('accModal', '<div class="xTag">👤 MINHA CONTA</div><h2>' + escH(p.avatar || '🏎️') + ' ' + escH(p.nick || 'Piloto') + '</h2>' +
+        '<p class="xSmall">' + escH(ACC.user.email || '') + ' · nível ' + (p.level || 1) + ' · progresso salvo na nuvem ' + (ACC.lastUpAt ? 'às ' + new Date(ACC.lastUpAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'automaticamente') + '</p>' +
+        '<label class="accF">Apelido no ranking<input data-k="nick" maxlength="20" value="' + escH(p.nick || '') + '"></label>' +
+        '<div class="accF">Avatar<div class="accAv">' + AVATARS.map(a => '<button type="button" data-av="' + a + '" class="' + (a === p.avatar ? 'on' : '') + '">' + a + '</button>').join('') + '</div></div>' +
+        '<label class="accF">Cidade<input data-k="city" maxlength="40" value="' + escH(p.city || '') + '" placeholder="ex.: Belém"></label>' +
+        '<label class="accF">Carro favorito<select data-k="favCar"><option value="">—</option>' + cars.map(c => '<option' + (c === p.favCar ? ' selected' : '') + '>' + escH(c) + '</option>').join('') + '</select></label>' +
+        '<p data-msg class="accMsg"></p>' +
+        '<div class="accRow"><button type="button" class="accMain" data-a="save">Salvar perfil</button><button type="button" data-a="sync">☁️ Salvar progresso agora</button></div>' +
+        '<div class="accRow"><button type="button" data-a="rank">🏆 Ver ranking</button><button type="button" data-a="out">Sair</button><button type="button" class="accDanger" data-a="del">Excluir conta</button></div>' + PRIV);
+      let av = p.avatar || '🏎️';
+      el.addEventListener('click', async e => {
+        const b = e.target.closest('[data-av]'); if (b) { av = b.dataset.av; el.querySelectorAll('[data-av]').forEach(x => x.classList.toggle('on', x === b)); return }
+        const a = e.target.closest('[data-a]')?.dataset.a; if (!a || ACC.busy) return; ACC.busy = true;
+        const v = k => el.querySelector('[data-k="' + k + '"]').value.trim();
+        try {
+          if (a === 'save') { if (v('nick').length < 2) throw { message: 'apelido curto' }; await saveProfile({ nick: v('nick'), avatar: av, city: v('city'), favCar: v('favCar') }); accMsg(el, 'Perfil salvo ✓', true); el.querySelector('h2').textContent = av + ' ' + v('nick') }
+          else if (a === 'sync') { await accUpload(true); accMsg(el, 'Progresso salvo na nuvem ✓', true) }
+          else if (a === 'rank') { el.remove(); openRanking() }
+          else if (a === 'out') { await accUpload(true).catch(() => { }); await ACC.A.signOut(ACC.auth); el.remove() }
+          else if (a === 'del') {
+            if (!confirmDel(el)) { ACC.busy = false; return }
+            const { F } = ACC, uid = ACC.user.uid;
+            try { const qs = await F.getDocs(F.query(F.collection(ACC.db, 'scores'), F.where('uid', '==', uid))); for (const d of qs.docs) await F.deleteDoc(d.ref) } catch (er) { }
+            await F.deleteDoc(F.doc(ACC.db, 'saves', uid)).catch(() => { }); await F.deleteDoc(F.doc(ACC.db, 'profiles', uid)).catch(() => { });
+            await ACC.A.deleteUser(ACC.user); el.remove(); alertBox('Conta e dados apagados. O progresso deste aparelho continua aqui.');
+          }
+        } catch (er) { accMsg(el, er && er.message === 'apelido curto' ? 'Apelido precisa de pelo menos 2 letras.' : errPt(er)) }
+        ACC.busy = false;
+      });
+    }
+    function confirmDel(el) {
+      if (el.dataset.delAsk === '1') return true;
+      el.dataset.delAsk = '1'; accMsg(el, 'Tem certeza? Isso apaga sua conta, perfil, progresso na nuvem e tempos do ranking (não dá para desfazer). Toque em “Excluir conta” de novo para confirmar.');
+      return false;
+    }
+    // ---------- progresso na nuvem ----------
+    const bundleStr = () => { try { return JSON.stringify(saveBundle()) } catch (e) { return '' } };
+    const syncInfo = () => { try { return JSON.parse(localStorage.getItem('pista-studio-sync') || '{}') } catch (e) { return {} } };
+    async function accUpload(force) {
+      if (!ACC.user || !ACC.ready) return;
+      if (mode === 'race' && !force) return;
+      const s = bundleStr(); if (!s || (!force && s === ACC.lastUp)) return;
+      const { F } = ACC, now = Date.now();
+      await F.setDoc(F.doc(ACC.db, 'saves', ACC.user.uid), { data: s, updatedAt: now, credits: career.credits | 0, level: (() => { try { return pilotLevel() } catch (e) { return 1 } })(), cars: (career.cars || []).length });
+      ACC.lastUp = s; ACC.lastUpAt = now;
+      try { localStorage.setItem('pista-studio-sync', JSON.stringify({ uid: ACC.user.uid, at: now })) } catch (e) { }
+      try { if (ACC.profile && ACC.profile.level !== pilotLevel()) saveProfile(ACC.profile) } catch (e) { }
+    }
+    function applyBundle(data) {
+      if (data.career) localStorage.setItem(careerKey, data.career);
+      if (data.setups) localStorage.setItem(setupKey, data.setups);
+      if (data.customs) localStorage.setItem(customKey, data.customs);
+      for (const [k, n] of [['graphics', 'pista-studio-graphics'], ['cam', 'pista-studio-cam-v1'], ['diff', 'pista-studio-diff'], ['nome', 'pista-studio-nome'], ['fantasma', 'pista-studio-fantasma']]) if (data[k]) localStorage.setItem(n, data[k]);
+      if (data.recs && typeof data.recs === 'object') for (const k in data.recs) if (/^pista-studio-/.test(k) && typeof data.recs[k] === 'string') localStorage.setItem(k, data.recs[k]);
+    }
+    async function accOnUser(u) {
+      accButton();
+      if (!u) { ACC.profile = null; accButton(); return }
+      try { await loadProfile(u) } catch (e) { }
+      let remote = null;
+      try { const s = await ACC.F.getDoc(ACC.F.doc(ACC.db, 'saves', u.uid)); if (s.exists()) remote = s.data() } catch (e) { }
+      const info = syncInfo(), localStr = bundleStr();
+      if (!remote) { await accUpload(true).catch(() => { }); toastAcc('☁️ Conta criada · progresso salvo na nuvem'); return }
+      if (remote.data === localStr) { ACC.lastUp = localStr; ACC.lastUpAt = remote.updatedAt; return }
+      const fresh = (career.xp || 0) < 50 && !Object.keys(career.medals || {}).length && (career.credits | 0) <= 200;
+      if (info.uid === u.uid && info.at >= remote.updatedAt) { await accUpload(true).catch(() => { }); return }
+      if (fresh || (info.uid === u.uid && info.at < remote.updatedAt)) { try { applyBundle(JSON.parse(remote.data)); localStorage.setItem('pista-studio-sync', JSON.stringify({ uid: u.uid, at: remote.updatedAt })); sessionStorage.setItem('acc-loaded', '1'); location.reload() } catch (e) { } return }
+      // os dois têm progresso diferente: o jogador escolhe
+      const el = accModal('accChoose', '<div class="xTag">☁️ PROGRESSO</div><h2>Qual progresso usar?</h2>' +
+        '<div class="xBtns"><button type="button" data-c="cloud">☁️ O da conta<small>' + (remote.credits | 0) + ' créditos · nível ' + (remote.level || 1) + ' · ' + (remote.cars || 1) + ' carro(s) · salvo em ' + new Date(remote.updatedAt).toLocaleDateString('pt-BR') + '</small></button>' +
+        '<button type="button" data-c="local">📱 O deste aparelho<small>' + (career.credits | 0) + ' créditos · nível ' + (() => { try { return pilotLevel() } catch (e) { return 1 } })() + ' · ' + (career.cars || []).length + ' carro(s)</small></button></div>' +
+        '<p class="xSmall">O que não for escolhido é substituído.</p>');
+      el.querySelector('.xClose').remove();
+      el.addEventListener('click', async e => {
+        const c = e.target.closest('[data-c]')?.dataset.c; if (!c) return;
+        if (c === 'cloud') { applyBundle(JSON.parse(remote.data)); try { localStorage.setItem('pista-studio-sync', JSON.stringify({ uid: u.uid, at: remote.updatedAt })) } catch (er) { } location.reload() }
+        else { await accUpload(true).catch(() => { }); el.remove(); toastAcc('☁️ Progresso deste aparelho salvo na conta') }
+      });
+    }
+    function toastAcc(t) { try { roadNote = t; roadNoteTime = 2.6; const el = document.createElement('div'); el.className = 'accToast'; el.textContent = t; document.body.append(el); setTimeout(() => el.remove(), 2800) } catch (e) { } }
+    setInterval(() => { accUpload(false).catch(() => { }) }, 20000);
+    addEventListener('visibilitychange', () => { if (document.hidden) accUpload(false).catch(() => { }) });
+    // ---------- ranking online ----------
+    function rankKey() {
+      const idx = $('route').selectedIndex;
+      if (streetMode() && route.laps !== 1) return 'r' + idx + 'k' + streetKm();
+      return 'r' + idx;
+    }
+    async function accScore(time) {
+      if (!ACC.user || !ACC.profile || !(time > 10) || deliveryRun || chaseMode() || dailyMode()) return;
+      const { F } = ACC, key = rankKey(), id = key + '_' + ACC.user.uid, ref = F.doc(ACC.db, 'scores', id);
+      try {
+        const old = await F.getDoc(ref); if (old.exists() && old.data().time <= time) return;
+        let carName = ''; try { carName = $('car').options[$('car').selectedIndex].text } catch (e) { }
+        await F.setDoc(ref, { uid: ACC.user.uid, route: key, time: Math.round(time * 100) / 100, nick: ACC.profile.nick, avatar: ACC.profile.avatar || '', city: ACC.profile.city || '', car: carName.slice(0, 40), at: Date.now() });
+        toastAcc('🏆 Novo recorde seu no ranking online!');
+      } catch (e) { }
+    }
+    async function openRanking(key) {
+      if (!ACC.ready) { const ok = await accInit(); if (!ok) { alertBox('O ranking online funciona no site do jogo.'); return } }
+      const opts = [...$('route').options].map((o, i) => [('r' + i), o.text]);
+      key = key || rankKey();
+      const el = accModal('rankModal', '<div class="xTag">🏆 RANKING ONLINE</div><h2>Melhores tempos</h2>' +
+        '<label class="accF">Pista<select data-k="route">' + opts.map(([k, t]) => '<option value="' + k + '"' + (k === key.replace(/k\d+$/, '') ? ' selected' : '') + '>' + escH(t) + '</option>').join('') + '</select></label>' +
+        '<label class="accF">Prova<select data-k="kind"><option value="">Corrida normal</option><option value="k3">Racha · curta</option><option value="k7">Racha · longa</option><option value="k12">Racha · maratona</option></select></label>' +
+        '<ol class="rankList"><li>Carregando…</li></ol>' + (ACC.user ? '' : '<p class="xSmall">Entre com uma conta para seu tempo aparecer aqui.</p>'));
+      const kSel = el.querySelector('[data-k="kind"]'); const km = (key.match(/k\d+$/) || [''])[0]; kSel.value = km;
+      const load = async () => {
+        const k = el.querySelector('[data-k="route"]').value + kSel.value, list = el.querySelector('.rankList');
+        list.innerHTML = '<li>Carregando…</li>';
+        try {
+          const { F } = ACC, qs = await F.getDocs(F.query(F.collection(ACC.db, 'scores'), F.where('route', '==', k), F.limit(300)));
+          const rows = qs.docs.map(d => d.data()).filter(r => typeof r.time === 'number').sort((a, b) => a.time - b.time).slice(0, 25);
+          list.innerHTML = rows.length ? rows.map((r, i) => '<li class="' + (ACC.user && r.uid === ACC.user.uid ? 'me' : '') + '"><b>' + (i + 1) + '</b><span>' + escH(r.avatar || '🏎️') + ' ' + escH(r.nick) + (r.city ? ' <small>· ' + escH(r.city) + '</small>' : '') + '<small class="rkCar">' + escH(r.car || '') + '</small></span><em>' + fmt(r.time) + '</em></li>').join('') : '<li>Ninguém correu aqui ainda. Seja o primeiro!</li>';
+        } catch (e) { list.innerHTML = '<li>Não foi possível carregar agora.</li>' }
+      };
+      el.querySelector('[data-k="route"]').onchange = load; kSel.onchange = load; load();
+    }
+    try { if (sessionStorage.getItem('acc-loaded')) { sessionStorage.removeItem('acc-loaded'); setTimeout(() => toastAcc('☁️ Progresso da conta carregado'), 1500) } } catch (e) { }
+    setTimeout(() => { if (accAllowed()) accInit(); else { ACC.failed = true; accButton() } }, 1200);
 
     requestAnimationFrame(frame);
 
