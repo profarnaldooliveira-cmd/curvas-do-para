@@ -934,7 +934,7 @@
     .arrHead small { color: #9fb39a; letter-spacing: .12em; font-size: .7rem }
     .arrHead h2 { margin: 2px 0 0; font-size: 1.45rem }
     .arrCred { background: #d6ff6022; color: #d6ff60; border: 1px solid #d6ff6055; padding: 6px 10px; border-radius: 999px; font-weight: 700; white-space: nowrap; font-size: .9rem }
-    .arrX { background: #ffffff14; border: 0; color: #fff; width: 38px; height: 38px; border-radius: 10px; font-size: 1.1rem; cursor: pointer }
+    .arrX { background: #ffffff14; border: 0; color: #fff; min-width: 38px; padding: 0 12px; white-space: nowrap; font-weight: 800; height: 38px; border-radius: 10px; font-size: 1.1rem; cursor: pointer }
     .arrTabs { display: flex; gap: 6px; margin: 14px 0 6px; border-bottom: 1px solid #ffffff1a }
     .arrTabs button { background: none; border: 0; color: #b9c6b2; padding: 9px 14px; font-weight: 700; cursor: pointer; border-bottom: 3px solid transparent }
     .arrTabs button.on { color: #d6ff60; border-color: #d6ff60 }
@@ -1313,6 +1313,14 @@
     #finishBar[hidden] { display: none }
     #finishBar button { flex: 1 1 auto; min-height: 44px; padding: 10px 14px; border-radius: 12px; border: 1px solid #ffffff2e; background: #ffffff12; color: #eef4ee; font: 800 .95rem system-ui, sans-serif; cursor: pointer }
     #finishBar .fbMain { flex-basis: 100%; border: 0; background: linear-gradient(90deg, #d8ff6a, #9fe870); color: #10200a; font-size: 1.05rem }
+    /* ---------- navegação ---------- */
+    body:not(.hasTabs) #homeOpen { position: sticky; top: 0; z-index: 5; } #homeOpen { box-shadow: 0 4px 14px #0009; background: #16221cf2 !important; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px) }
+    #qsTop { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 2px }
+    #quickStart #qsTop button { width: auto; flex-direction: row; align-items: center; padding: 8px 14px; border-radius: 999px; font: 700 .88rem system-ui, sans-serif; background: #ffffff12; min-height: 40px }
+    body.hasTabs #menuTabs { grid-template-columns: auto repeat(4, 1fr) }
+    #tabHome { padding: 9px 10px !important; background: #2a3a32 !important; color: #d6ff60; white-space: nowrap }
+    body.hasTabs #menuTabs button { min-width: 0; overflow: hidden; text-overflow: ellipsis }
+    @media (max-width: 380px) { body.hasTabs #menuTabs { gap: 3px } body.hasTabs #menuTabs button { font-size: 12px } #tabHome { padding: 9px 8px !important } }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -9656,7 +9664,7 @@
     function arrRenderHub() {
       const hub = $('arrHub'); if (!hub || hub.hidden) return;
       const d = arrData(), ui = d.ui, m = ui.model, owned = arrOwned();
-      let html = '<div class="arrWrap"><div class="arrHead"><div><small>AUTÓDROMO DO GUAMÁ · PARÁ</small><h2>🏁 Arrancada Guamá</h2></div><div class="arrCred">' + career.credits + ' créditos</div><button type="button" class="arrX" data-act="close" aria-label="Fechar">✕</button></div>' +
+      let html = '<div class="arrWrap"><div class="arrHead"><div><small>AUTÓDROMO DO GUAMÁ · PARÁ</small><h2>🏁 Arrancada Guamá</h2></div><div class="arrCred">' + career.credits + ' créditos</div><button type="button" class="arrX" data-act="close" aria-label="Voltar">← Voltar</button></div>' +
         '<div class="arrTabs"><button type="button" data-tab="race" class="' + (arrTab === 'race' ? 'on' : '') + '">Prova</button><button type="button" data-tab="shop" class="' + (arrTab === 'shop' ? 'on' : '') + '">Oficina</button><button type="button" data-tab="rec" class="' + (arrTab === 'rec' ? 'on' : '') + '">Recordes</button></div>';
       if (d.pending) {
         const p = d.pending;
@@ -12436,6 +12444,7 @@
       if (!GATE.el) return; GATE.closed = true;
       GATE.el.classList.add('out'); const el = GATE.el; GATE.el = null;
       setTimeout(() => el.remove(), 380);
+      setTimeout(() => { try { if (mode === 'menu' && !document.getElementById('quickStart') && !document.getElementById('tutorial')) showQuickStart() } catch (e) { } }, 60);
       if (msg) setTimeout(() => { try { toastAcc(msg) } catch (e) { } }, 400);
     }
     function gateNeeded() { try { return mode === 'menu' && !/[?&]direto\b/.test(location.search) } catch (e) { return false } }
@@ -12622,7 +12631,7 @@
           const a = e.target.closest('[data-f]')?.dataset.f; if (!a) return;
           if (a === 'again') $('start').click();
           else if (a === 'ms') openMissions();
-          else if (a === 'home') $('homeOpen')?.click();
+          else if (a === 'home') uxGoHome();
         });
       }
       const left = (() => { try { return msEnsure().list.filter(o => !o.done).length } catch (e) { return 0 } })();
@@ -12631,6 +12640,91 @@
       bar.hidden = false;
     }
     setInterval(() => { try { uxFinishBar(); if (mode !== 'race' && $('firstHint')) $('firstHint').remove() } catch (e) { } }, 400);
+
+    // ===================== Navegação: Tela inicial é a casa · botões Voltar · botão voltar do celular =====================
+    function uxGoHome() {
+      document.querySelectorAll('.xModal').forEach(e => e.remove());
+      try { if (arrHubOpen) { UXN.silent = true; closeArrancada(); UXN.silent = false } } catch (e) { }
+      try { if ($('arrResult')) $('arrResult').hidden = true } catch (e) { }
+      if (mode === 'finish' || mode === 'pause') { try { backToGarage() } catch (e) { } }
+      if (mode === 'menu') { try { showQuickStart() } catch (e) { } }
+    }
+    const UXN = { arrFrom: 'menu', silent: false, armed: false, homeAt: -1e9 };
+    addEventListener('click', e => { if (e.target.closest && e.target.closest('#quickStart')) UXN.homeAt = performance.now() }, true);
+    const _openArr = openArrancada;
+    openArrancada = function (tab) {
+      if (!arrHubOpen && !($('arrResult') && !$('arrResult').hidden)) UXN.arrFrom = $('quickStart') || performance.now() - UXN.homeAt < 800 ? 'home' : 'menu';
+      return _openArr(tab);
+    };
+    const _closeArr = closeArrancada;
+    closeArrancada = function () {
+      _closeArr();
+      if (!UXN.silent && UXN.arrFrom === 'home' && mode === 'menu') try { showQuickStart() } catch (e) { }
+    };
+    // botão "Tela inicial" do menu: funciona também depois da bandeirada e fica sempre à vista
+    setTimeout(() => { try { const h = $('homeOpen'); if (h) { h.innerHTML = '← Tela inicial'; h.onclick = uxGoHome } } catch (e) { } }, 0);
+    // ---------- Tela inicial: conta e ranking no topo ----------
+    function gateReopen() {
+      try { sessionStorage.removeItem('curvas-gate') } catch (e) { }
+      GATE.closed = false; GATE.tab = 'in'; showGate();
+    }
+    function uxHomeTop() {
+      const q = $('quickStart'); if (!q) return;
+      const card = q.querySelector('.qsCard'); if (!card) return;
+      let top = $('qsTop');
+      const online = accAllowed() && !ACC.failed;
+      const html = online
+        ? (ACC.user ? '<button type="button" data-t="acc">' + escH(ACC.profile?.avatar || '👤') + ' ' + escH(ACC.profile?.nick || 'Minha conta') + '</button>' : '<button type="button" data-t="login">👤 Entrar ou criar conta</button>') + '<button type="button" data-t="rank">🏆 Ranking</button>'
+        : '';
+      if (!html) { top?.remove(); return }
+      if (!top) {
+        top = document.createElement('div'); top.id = 'qsTop'; card.prepend(top);
+        top.addEventListener('click', e => {
+          const t = e.target.closest('[data-t]')?.dataset.t; if (!t) return;
+          if (t === 'login') { q.remove(); gateReopen() }
+          else if (t === 'acc') openAccount();
+          else if (t === 'rank') openRanking();
+        });
+      }
+      if (top.dataset.h !== html) { top.innerHTML = html; top.dataset.h = html }
+    }
+    setInterval(() => { try { uxHomeTop() } catch (e) { } }, 500);
+    // ---------- botão voltar do celular / do navegador ----------
+    function uxBack() {
+      if ($('gate')) return false;
+      const modals = document.querySelectorAll('.xModal'); if (modals.length) { modals[modals.length - 1].remove(); return true }
+      if ($('tutorial')) { $('tutorial').remove(); return true }
+      if (mode === 'race') { togglePause(); return true }
+      if (mode === 'drag') { try { arrAskQuit() } catch (e) { } return true }
+      if (mode === 'pause') return true;
+      if ($('arrResult') && !$('arrResult').hidden) { $('arrResult').hidden = true; closeArrancada(); return true }
+      if (arrHubOpen) { closeArrancada(); return true }
+      if ($('quickStart')) return false;
+      if (mode === 'menu' || mode === 'finish') { uxGoHome(); return true }
+      return false;
+    }
+    function uxNavOk() { try { return /^https?:$|^file:$/.test(location.protocol) && !/claude\.ai$|claudeusercontent\.com$|claudemcpcontent\.com$/.test(location.hostname) && window.top === window } catch (e) { return false } }
+    if (uxNavOk()) {
+      const arm = () => { if (UXN.armed) return; UXN.armed = true; try { history.pushState({ cdp: 1 }, '') } catch (e) { } };
+      addEventListener('pointerdown', arm, true); addEventListener('keydown', arm, true);
+      addEventListener('popstate', () => {
+        if (!UXN.armed) return;
+        let handled = false; try { handled = uxBack() } catch (e) { }
+        if (handled) { try { history.pushState({ cdp: 1 }, '') } catch (e) { } return }
+        // na Tela inicial: o próximo "voltar" sai do jogo (avisa antes)
+        UXN.armed = false;
+        try { toastAcc('Toque em voltar de novo para sair do jogo') } catch (e) { }
+      });
+    }
+    // no celular as abas da garagem ficam presas no topo: o "← Início" vai junto com elas
+    setInterval(() => {
+      try {
+        const bar = $('menuTabs'), on = !!(bar && bar.offsetParent);
+        document.body.classList.toggle('hasTabs', on);
+        if (on && !$('tabHome')) { const b = document.createElement('button'); b.type = 'button'; b.id = 'tabHome'; b.setAttribute('aria-label', 'Voltar para a Tela inicial'); b.onclick = uxGoHome; bar.prepend(b) }
+        const hb = $('tabHome'); if (hb) { const t = innerWidth <= 380 ? '←' : '← Início'; if (hb.textContent !== t) hb.textContent = t }
+      } catch (e) { }
+    }, 400);
 
     requestAnimationFrame(frame);
 
