@@ -4497,7 +4497,7 @@
       const camBack = [6.4, 8.6, 2.55, 1.85][camMode];
       const camUp = [2.95, 4.15, 1.38 + rideMod, 1.18 + rideMod][camMode];
       const horizonRatio = [.41, .44, .38, .40][camMode];
-      const car = cars[model], horizon = h * horizonRatio + shake;
+      const car = cars[model], horizon = h * horizonRatio + shake + cam3dPitch();
       const fovKick = (mode === 'race' || mode === 'pause') && camMode < 2 ? (1 - .085 * clamp((v - 22) / 26, 0, 1)) * (nitroOn ? .93 : 1) : 1;
       const focal = Math.max(Math.min(h * (camMode === 1 ? .72 : .79), w * 1.14), w / h > 1.9 ? w * .44 : 0) * fovKick, origin = z - camBack, eye = hill(z) + camUp + (mode === 'race' || mode === 'pause' ? bumpSurface(z+.7,x)*(camMode<2?.52:.9) : 0);
       const movingView = mode === 'race' || mode === 'pause';
@@ -4854,22 +4854,37 @@
         ctx.fillStyle = color; ctx.fillRect(x0 - k * width / 2, y1, Math.max(.6, k * width), y0 - y1);
         return [x0, y0, y1, k];
       };
-      // Defensas metálicas: nas curvas (e na serra, sempre)
+      // Defensas metálicas: nas curvas (e na serra, sempre) · com volume (lâmina em "W", topo, postes em caixa e sombra)
       if (kind !== 2) {
-        const step = 4, rail = tone(170, 177, 179), shade = tone(96, 103, 106);
+        const step = 4, rail = tone(170, 177, 179), shade = tone(96, 103, 106), lit = tone(214, 220, 222), deep = tone(118, 125, 128), top = tone(196, 202, 204), postSide = tone(70, 76, 78);
+        const sunSide = dayPhase === 'morning' ? -1 : dayPhase === 'dusk' ? 1 : .35;
         for (let s = Math.floor((origin + reach) / step) * step; s > origin + 3; s -= step) {
           if (bridgeAt(s) || bridgeAt(s + step)) continue;
           const bend = curve(s);
           if (kind !== 7 && Math.abs(bend) < .03) continue;
           for (const side of kind === 7 ? [-1, 1] : [bend > 0 ? -1 : 1]) {
             const l = side * (edge + .6);
-            const a0 = project(s, l, .45), a1 = project(s, l, .75), b0 = project(s + step, l, .45), b1 = project(s + step, l, .75);
+            const a0 = project(s, l, .45), b0 = project(s + step, l, .45);
             if (a0[2] < .35 || Math.max(a0[0], b0[0]) < -40 || Math.min(a0[0], b0[0]) > w + 40) continue;
-            poly([a0, b0, b1, a1], rail);
-            const m0 = project(s, l, .58), m1 = project(s + step, l, .58);
-            ctx.strokeStyle = shade; ctx.lineWidth = Math.max(.5, a0[2] * .03);
-            ctx.beginPath(); ctx.moveTo(m0[0], m0[1]); ctx.lineTo(m1[0], m1[1]); ctx.stroke();
-            post(s, l, .75, .09, shade);
+            if (lite || a0[2] < 1.1) { // longe ou modo leve: versão simples
+              const a1 = project(s, l, .75), b1 = project(s + step, l, .75);
+              poly([a0, b0, b1, a1], rail); post(s, l, .75, .09, shade); continue;
+            }
+            // sombra no chão, para fora da pista (a defensa "assenta" no acostamento)
+            if (!night) poly([project(s, l - side * .05, 0), project(s + step, l - side * .05, 0), project(s + step, l + side * (.32 + .12 * sunSide * side), 0), project(s, l + side * (.32 + .12 * sunSide * side), 0)], 'rgba(10,16,12,' + (raining ? .14 : .22) + ')');
+            // poste em caixa: face de frente para a pista + face lateral (mais escura)
+            { const pw = .065, pl = l + side * .05, [fx, fy, fk] = project(s, pl - side * pw), [, ftop] = project(s, pl - side * pw, .72), [bx2] = project(s + .13, pl - side * pw);
+              if (fk > .35) { ctx.fillStyle = postSide; ctx.fillRect(Math.min(fx, bx2) - fk * pw, ftop, Math.max(.6, Math.abs(bx2 - fx) + fk * pw * 2), fy - ftop); ctx.fillStyle = shade; ctx.fillRect(fx - fk * pw, ftop, Math.max(.6, fk * pw * 2), fy - ftop) } }
+            // lâmina ondulada: faixas claras e escuras dão o relevo do "W"
+            const bands = [[.45, .5, deep], [.5, .58, lit], [.58, .62, shade], [.62, .7, lit], [.7, .75, rail]];
+            for (const [h0, h1, col] of bands) poly([project(s, l, h0), project(s + step, l, h0), project(s + step, l, h1), project(s, l, h1)], col);
+            // topo da lâmina (a câmera vê de cima)
+            poly([project(s, l, .75), project(s + step, l, .75), project(s + step, l + side * .09, .74), project(s, l + side * .09, .74)], top);
+            // brilho do sol correndo pela lâmina
+            if (!night && !raining) {
+              const g = .5 + .5 * Math.sin(s * .11 + elapsed * .6 + side);
+              if (g > .72) poly([project(s, l, .53), project(s + step, l, .53), project(s + step, l, .56), project(s, l, .56)], 'rgba(255,255,255,' + ((g - .72) * 1.4).toFixed(2) + ')');
+            }
           }
         }
       }
@@ -5940,33 +5955,49 @@
         else if (view === 1) next = ang < up1 - gap ? 0 : ang > up2 ? 2 : 1;
         else if (view === 2) next = ang < up2 - gap ? (ang < up1 - gap ? 0 : 1) : 2;
         item.photoView = next;
-        if (next > 0 && depC > 1.6) {
-          const seeLeft = latC > 0;
-          let pic, flipPic = false, hMul = 1.12, along = .15;
+        // transição suave: a foto nova surge por cima da anterior em ~0,2 s (o carro "gira" em vez de trocar seco)
+        { const nowT = performance.now(), dtv = Math.min(.1, (nowT - (item.vbAt || nowT)) / 1000); item.vbAt = nowT;
+          if (item.vb === undefined || depC > 70 || liteGraphics()) item.vb = next; else item.vb += clamp(next - item.vb, -dtv * 5.5, dtv * 5.5) }
+        const vbL = Math.floor(item.vb + 1e-4), vbT = item.vb - vbL;
+        const viewsToDraw = vbT < .02 ? [[vbL, 1]] : [[vbL, Math.min(1, 2 * (1 - vbT))], [vbL + 1, Math.min(1, 2 * vbT)]];
+        if (depC > 1.6 && viewsToDraw.some(([vw]) => vw > 0)) {
+          const seeLeft = latC > 0, baseAlpha = ctx.globalAlpha, fBase = ctx.filter;
           // Vindo na direção contrária: a frente aparece, e o lado visível inverte.
           const sideL = direction === 1 ? seeLeft : !seeLeft;
-          if (next === 2) {
-            const sideKey = images['ang' + angN + (sideL ? 'l' : 'r')], other = images['ang' + angN + (sideL ? 'r' : 'l')];
-            if (ready(sideKey)) pic = sideKey; else if (ready(other)) { pic = other; flipPic = true }
-            hMul = 1.04; along = 0;
-          }
-          if (!pic && direction === 1) { const rl = images['ang' + angN + 'rl']; pic = seeLeft && ready(rl) ? rl : q34; flipPic = seeLeft && !ready(rl) }
-          if (!pic) { const fr = images['ang' + angN + 'fr']; pic = seeLeft && ready(fr) ? fr : q34; flipPic = seeLeft && !ready(fr) }
-          if (next === 1) { along = .55; hMul = 1.04 }
-          const [cx, cy, ck] = project(s - type.half * along, lane);
-          const hh = ck * tall * hMul, ww = hh * pic.naturalWidth / pic.naturalHeight;
-          const shiftX = next === 1 ? (seeLeft ? -1 : 1) * ww * .06 : 0;
-          ctx.save(); ctx.translate(cx + shiftX, cy + ck * .05); if (flipPic) ctx.scale(-1, 1);
-          ctx.drawImage(pic, -ww / 2, -hh, ww, hh); ctx.restore();
-          if (emergencyLights && type.lightbar) {
-            // giroflex piscando sobre a foto (vermelho/azul alternando)
-            ctx.filter = 'none'; ctx.globalCompositeOperation = 'screen';
-            const blink = Math.floor(elapsed * 6) % 2, barX = cx + shiftX + (next === 2 ? 0 : (seeLeft ? 1 : -1) * ww * .08);
-            const ly = cy + ck * .05 - hh * .955;
-            const blue = type.sprite === 'samu' || type.sprite === 'bvan' ? '#ff3b2c' : '#3f7dff';
-            lampGlow(barX - ww * .07, ly, ck * (night ? .42 : .26), blink ? '#ff3b2ccc' : '#ff3b2c33');
-            lampGlow(barX + ww * .07, ly, ck * (night ? .42 : .26), blink ? blue + '33' : blue + 'cc');
-          }
+          const drawRearView = al => {
+            if (rear <= origin + .78) return;
+            ctx.globalAlpha = baseAlpha * al; const rh = type.rearHeight || roof;
+            drawFacadeTexture(im, [project(rear, lane - half, rh), project(rear, lane + half, rh), project(rear, lane + half), project(rear, lane - half)]);
+          };
+          const drawPhotoView = (vw, al, top) => {
+            let pic, flipPic = false, hMul = 1.12, along = .15;
+            if (vw === 2) {
+              const sideKey = images['ang' + angN + (sideL ? 'l' : 'r')], other = images['ang' + angN + (sideL ? 'r' : 'l')];
+              if (ready(sideKey)) pic = sideKey; else if (ready(other)) { pic = other; flipPic = true }
+              hMul = 1.04; along = 0;
+            }
+            if (!pic && direction === 1) { const rl = images['ang' + angN + 'rl']; pic = seeLeft && ready(rl) ? rl : q34; flipPic = seeLeft && !ready(rl) }
+            if (!pic) { const fr = images['ang' + angN + 'fr']; pic = seeLeft && ready(fr) ? fr : q34; flipPic = seeLeft && !ready(fr) }
+            if (vw === 1) { along = .55; hMul = 1.04 }
+            const [cx, cy, ck] = project(s - type.half * along, lane);
+            const hh = ck * tall * hMul, ww = hh * pic.naturalWidth / pic.naturalHeight;
+            const shiftX = vw === 1 ? (seeLeft ? -1 : 1) * ww * .06 : 0;
+            ctx.globalAlpha = baseAlpha * al; ctx.filter = fBase;
+            ctx.save(); ctx.translate(cx + shiftX, cy + ck * .05); if (flipPic) ctx.scale(-1, 1);
+            ctx.drawImage(pic, -ww / 2, -hh, ww, hh); ctx.restore();
+            if (top && emergencyLights && type.lightbar) {
+              // giroflex piscando sobre a foto (vermelho/azul alternando)
+              ctx.save(); ctx.filter = 'none'; ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = baseAlpha;
+              const blink = Math.floor(elapsed * 6) % 2, barX = cx + shiftX + (vw === 2 ? 0 : (seeLeft ? 1 : -1) * ww * .08);
+              const ly = cy + ck * .05 - hh * .955;
+              const blue = type.sprite === 'samu' || type.sprite === 'bvan' ? '#ff3b2c' : '#3f7dff';
+              lampGlow(barX - ww * .07, ly, ck * (night ? .42 : .26), blink ? '#ff3b2ccc' : '#ff3b2c33');
+              lampGlow(barX + ww * .07, ly, ck * (night ? .42 : .26), blink ? blue + '33' : blue + 'cc');
+              ctx.restore();
+            }
+          };
+          viewsToDraw.forEach(([vw, al], i) => { if (al <= .01) return; if (vw === 0) drawRearView(al); else drawPhotoView(vw, al, i === viewsToDraw.length - 1) });
+          ctx.globalAlpha = baseAlpha;
           ctx.restore();
           return;
         }
@@ -8939,7 +8970,7 @@
         lastPaint = now;
         if (pendingRes) { pendingRes = false; resize(); lastPaint = now }
         const paintStart = performance.now();
-        if (mode === 'drag') { try { arrDraw() } catch (e) { console.error(e) } } else { scene(); drawPlayerLamps(); cinematicPass(); if (mode === 'race' || mode === 'pause') { drawDamageSmoke(); drawCockpitCracks(); drawChaseLights(); try { drawSpeedFx(Math.min(.05, (now - (lastFxAt || now)) / 1000)); lastFxAt = now } catch (e) { } } else if (canvas.style.transform) canvas.style.transform = ''; updateSignals(); }
+        if (mode === 'drag') { try { arrDraw() } catch (e) { console.error(e) } } else { try { cam3dBegin() } catch (e) { } try { scene(); drawPlayerLamps() } finally { cam3dEnd() } cinematicPass(); if (mode === 'race' || mode === 'pause') { drawDamageSmoke(); drawCockpitCracks(); drawChaseLights(); try { drawSpeedFx(Math.min(.05, (now - (lastFxAt || now)) / 1000)); lastFxAt = now } catch (e) { } } else if (canvas.style.transform) canvas.style.transform = ''; updateSignals(); }
         if (perfOn) perfTick(now, performance.now() - paintStart);
         if (mode === 'race') {
           paintAvg = paintAvg * .94 + (performance.now() - paintStart) * .06;
@@ -13110,6 +13141,44 @@
     }
     for (const t of [400, 1200, 2500, 4000]) setTimeout(() => { try { radioUI() } catch (e) { } }, t);
     window.RADIO = RADIO;
+
+    // ===================== Câmera viva: inclina nas curvas, mergulha na freada, levanta na arrancada =====================
+    const CAM3D = { on: true, roll: 0, pitch: 0, acc: 0, lastV: 0, at: 0, active: false };
+    try { CAM3D.on = localStorage.getItem('pista-studio-cam3d') !== 'off' } catch (e) { }
+    function cam3dStep() {
+      const now = performance.now(), dt = Math.min(.05, Math.max(.001, (now - (CAM3D.at || now)) / 1000)); CAM3D.at = now;
+      const live = CAM3D.on && mode === 'race' && camMode < 2;
+      let rollT = 0, pitchT = 0;
+      if (live) {
+        // aceleração lateral da curva (v² × curvatura) → inclinação, como o corpo sente
+        const curv = (slope(z + 6) - slope(z - 2)) / 8, lat = v * v * curv;
+        rollT = clamp(-lat * .0024, -.035, .035);
+        // freada abaixa o "nariz" (horizonte sobe); arrancada levanta
+        const a = (v - CAM3D.lastV) / dt; CAM3D.acc += (clamp(a, -14, 8) - CAM3D.acc) * Math.min(1, dt * 6);
+        pitchT = clamp(-CAM3D.acc * .0016, -.012, .02);
+      }
+      CAM3D.lastV = v;
+      const kR = Math.min(1, dt * (live ? 3.2 : 6)), kP = Math.min(1, dt * 4.5);
+      if (mode !== 'pause') { CAM3D.roll += (rollT - CAM3D.roll) * kR; CAM3D.pitch += (pitchT - CAM3D.pitch) * kP }
+      if (!live && mode !== 'pause') { if (Math.abs(CAM3D.roll) < 1e-4) CAM3D.roll = 0; if (Math.abs(CAM3D.pitch) < 1e-4) CAM3D.pitch = 0 }
+    }
+    function cam3dPitch() { try { cam3dStep(); return CAM3D.pitch * h } catch (e) { return 0 } }
+    function cam3dBegin() {
+      CAM3D.active = false;
+      const r = CAM3D.roll; if (!r || camMode > 1 || (mode !== 'race' && mode !== 'pause')) return;
+      const cx = w / 2, cy = h * .6, sc = Math.cos(Math.abs(r)) + (w / h + h / w) * Math.abs(Math.sin(r)) * .62 + .004;
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(r); ctx.scale(sc, sc); ctx.translate(-cx, -cy); CAM3D.active = true;
+    }
+    function cam3dEnd() { if (CAM3D.active) { ctx.restore(); CAM3D.active = false } }
+    function cam3dUI() {
+      const list = $('xMoreList'); if (!list || $('cam3dBtn')) return;
+      const b = document.createElement('button'); b.type = 'button'; b.id = 'cam3dBtn';
+      const paint = () => b.textContent = '🎥 Câmera viva: ' + (CAM3D.on ? 'ligada' : 'desligada');
+      paint(); b.onclick = () => { CAM3D.on = !CAM3D.on; try { localStorage.setItem('pista-studio-cam3d', CAM3D.on ? 'on' : 'off') } catch (e) { } paint() };
+      list.append(b);
+    }
+    for (const t of [300, 1300, 2800]) setTimeout(() => { try { cam3dUI() } catch (e) { } }, t);
+    window.CAM3D = CAM3D;
 
     requestAnimationFrame(frame);
 
