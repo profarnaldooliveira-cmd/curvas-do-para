@@ -6225,7 +6225,7 @@
           const face = car.s - car.type.half;
           if (face - origin < 2 || face - origin > 230 || (!night && !headlightsOn() && !car.braking)) continue;
           for (const side of car.type.motorcycle || car.type.sprite === 'touring' ? [0] : [-1, 1]) {
-            const [px, py, k] = project(face, car.lane + side * car.type.width * .34, car.type.height * .33);
+            const [px, py, k] = car.direction < 0 || side === 0 ? project(face, car.lane + side * car.type.width * .34, car.type.height * .33) : project(...lampAt(car, side, face));
             const tint = car.direction < 0 ? '#ffedc0b0' : car.braking ? '#ff533dc2' : '#df422f6b';
             lampGlow(px, py, k * (car.braking ? .38 : .26), tint);
           }
@@ -7451,11 +7451,14 @@
     }
 
     function rearLampLayout(car) {
-      return car.lamps || [
+      if (car.lamps) return car.lamps;
+      // fotos trocadas (Creta) e carros novos: posição medida na própria foto
+      if (LAMPXY['car' + model]) return LAMPXY['car' + model];
+      return [
         [.39, .30], [.39, .27], [.39, .26], [.36, .35], [.40, .27],
         [.39, .41], [.41, .48], [.36, .57], [.39, .33], [.38, .48],
         [.38, .42], [.38, .45], [.38, .43], [.39, .34], [.38, .43], [.38, .46], [.39, .64]
-      ][model];
+      ][model] || [.38, .42];
     }
     function drawPlayerLamps() {
       if (!playerLamps || mode !== 'race') return;
@@ -7479,7 +7482,7 @@
           ctx.fillStyle = '#ffb72eea'; ctx.fillRect(signalX - pixels * .024, signalY - height * .012, pixels * .048, pixels * .024);
         }
       }
-      if (brake && car.centerBrakeLamp !== false) lampGlowLocal(0, -height * .67, pixels * .052, '#ff382ed0');
+      if (brake && car.centerBrakeLamp !== false) lampGlowLocal(0, -height * (car.centerLampY || .86), pixels * .045, '#ff382ed0');
       try { exhaustFlame(pixels, height) } catch (e) { }
       ctx.restore();
     }
@@ -11652,12 +11655,12 @@
         const face = car.s - car.type.half, d = face - origin;
         if (d < 2 || d > 230) continue;
         for (const side of car.type.motorcycle || car.type.sprite === 'touring' ? [0] : [-1, 1]) {
-          const [px, py, k] = project(face, car.lane + side * car.type.width * .34, car.type.height * .33);
+          const [px, py, k] = car.direction < 0 ? project(face, car.lane + side * car.type.width * .34, car.type.height * .33) : project(...lampAt(car, side, face));
           if (car.direction < 0) lampGlow(px, py, k * .9, '#fff1cc40');
           else {
             lampGlow(px, py, k * (car.braking ? .95 : .6), car.braking ? '#ff3a2a55' : '#ff302033');
             // reflexo vermelho no asfalto
-            const [rx, ry, rk] = project(face + .3, car.lane + side * car.type.width * .34, 0);
+            const [rx, ry, rk] = project(face + .3, car.lane + side * car.type.width * lampXY(car.type, car)[0], 0);
             ctx.save(); ctx.translate(rx, ry); ctx.scale(.35, 1.6); lampGlow(0, 0, rk * .45, raining ? '#ff3a2a50' : '#ff3a2a22'); ctx.restore();
           }
         }
@@ -11941,7 +11944,7 @@
         const d = car.s - origin; if (d < 2 || d > 200) continue;
         if (car.direction > 0 && (car.signal > 0 || car.laneMove) && blink) {
           const side = Math.sign((car.laneTo ?? 0) - car.lane) || 1, face = car.s - car.type.half;
-          const [px, py, k] = project(face, car.lane + side * car.type.width * .42, car.type.height * .36);
+          const [px, py, k] = car.direction > 0 ? project(...lampAt(car, side, face)) : project(face, car.lane + side * car.type.width * .42, car.type.height * .36);
           lampGlow(px, py, Math.max(6, k * .75), '#ffa41cf0'); ctx.save(); ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#ffb02e'; ctx.fillRect(px - Math.max(2, k * .14), py - Math.max(1.5, k * .07), Math.max(4, k * .28), Math.max(3, k * .14)); ctx.restore();
         }
         if (car.type.fire && (night || retro)) { const top = car.s + car.direction * car.type.half * .72, blinkR = Math.floor(elapsed * 6) % 2; for (const sd of [-1, 1]) { const [px, py, k] = project(top, car.lane + sd * car.type.width * .32, car.type.height * .97); if (k > .2) lampGlow(px, py, Math.max(3, k * .55), (sd > 0) === !!blinkR ? '#ff2a1ee0' : '#ff2a1e30') } }
@@ -13338,6 +13341,13 @@
     // avião cruzando o céu nas outras pistas (lateral de foto, sentido conforme o lado)
     const FLYOVER = ['gol', 'latam', 'emirates', 'e9x', 'jet', 'latam', 'gol', 'heli'];
     function flyoverPic(toLeft, n) { const id = FLYOVER[((n % FLYOVER.length) + FLYOVER.length) % FLYOVER.length]; const im = planeImg(id, toLeft ? 'sL' : 'sR'); return im || images[toLeft ? 'planeSideL' : 'planeSide'] }
+
+    // ===================== Lanternas no lugar certo: posição tirada da própria foto de cada veículo =====================
+    // [distância do centro (fração da largura), altura (fração da altura da traseira)]
+    const LAMPXY = {"car1":[0.34,0.304],"car2":[0.291,0.322],"car3":[0.407,0.424],"car4":[0.386,0.449],"car5":[0.384,0.497],"car8":[0.321,0.395],"car9":[0.368,0.585],"car10":[0.392,0.616],"car11":[0.378,0.71],"car12":[0.288,0.586],"car13":[0.418,0.537],"car14":[0.325,0.611],"car15":[0.362,0.476],"car16":[0.314,0.609],"car18":[0.408,0.454],"car20":[0.365,0.586],"car21":[0.405,0.581],"car22":[0.345,0.541],"car23":[0.413,0.571],"car24":[0.44,0.459],"car25":[0.401,0.584],"car26":[0.339,0.619],"poloRear":[0.393,0.606],"golBordoRear":[0.403,0.466],"truckWhite":[0.347,0.206],"truckGreen":[0.348,0.22],"van":[0.451,0.453],"kombi":[0.412,0.371],"mlVan":[0.443,0.423],"policePickup":[0.385,0.596],"policeSuv":[0.391,0.524],"samu":[0.44,0.22],"bvan":[0.44,0.22],"localAdventure":[0.209,0.563],"localBlueVan":[0.454,0.38],"localGrayVan":[0.421,0.402],"tow":[0.339,0.295],"semiBlueDump":[0.363,0.528],"semiRedTarp":[0.321,0.411],"localSchoolBus":[0.425,0.39],"localGrayBus":[0.426,0.383],"localYellowBus":[0.425,0.339],"barBus":[0.458,0.436],"car6":[0.41,0.43],"car17":[0.4,0.4],"car19":[0.38,0.55],"fire1":[0.42,0.12],"fire2":[0.42,0.12],"bus":[0.46,0.25]};
+    function lampXY(type, item) { return LAMPXY[item && item.golB ? 'golBordoRear' : type.sprite] || [.34, .33] }
+    // ponto da lanterna de um carro do trânsito (lado -1/1) em coordenadas da pista
+    function lampAt(car, side, face) { const [lx, ly] = lampXY(car.type, car); return [face, car.lane + side * car.type.width * lx, (car.type.rearHeight || car.type.height) * ly] }
 
     requestAnimationFrame(frame);
 
