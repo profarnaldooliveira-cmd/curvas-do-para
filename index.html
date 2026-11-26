@@ -9380,7 +9380,7 @@
     const arrSmooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t) };
     function arrTorque(turbo, r) {
       let tc = (.6 + 1.2 * r - 1.05 * r * r) * (.25 + .75 * arrSmooth(.05, .32, r));
-      if (turbo) tc *= .55 + .45 * arrSmooth(.24, .6, r);
+      if (turbo) tc *= .7 + .3 * arrSmooth(.22, .55, r);
       return tc;
     }
     const arrNorm = [0, 1].map(t => { let mx = 0; for (let r = .02; r <= 1; r += .005) mx = Math.max(mx, r * arrTorque(t, r)); return mx });
@@ -9397,13 +9397,13 @@
       parts = parts || arrDefaultParts(); cond = cond || {};
       const pw = [0, .09, .18, .28][parts.power || 0];
       const engC = (cond.motor ?? 100) / 100;
-      const P = s[0] * 735.5 * (ev ? .95 : .86) * (1 + pw) * (.9 + .1 * engC);
+      const P = s[0] * 735.5 * (ev ? .95 : turbo ? .9 : .88) * (1 + pw) * (.9 + .1 * engC);
       const mass = s[1] + 85, cda = m === 26 ? .64 : s[1] > 1200 ? .72 : .68;
       let vTop = 20; for (let i = 0; i < 60; i++) { const R = .5 * 1.2 * cda * vTop * vTop + .013 * mass * 9.81; vTop += (P * .95 / Math.max(1, R) - vTop) * .5 }
       const ratioF = ARR_RATIO[parts.ratio || 'o']?.[1] || 1;
       const tireC = (cond.pneus ?? 100) / 100;
-      const mu = [1, 1.15, 1.36][parts.tire || 0] * (.82 + .18 * tireC);
-      const df = s[2] === 'A' ? .97 : s[2] === 'R' ? .63 : .58;
+      const mu = [1.08, 1.22, 1.42][parts.tire || 0] * (.82 + .18 * tireC);
+      const df = s[2] === 'A' ? 1 : s[2] === 'R' ? .66 : .6;
       let vg;
       if (ev) vg = [Math.min(vTop, 44) * ratioF];
       else { const rm = ARR_RATIO_GEARS[parts.ratio || 'o'] || ARR_RATIO_GEARS.o, gs = ARR_GEARS[m] || ARR_GEARS.d; vg = gs.map((x, i) => x * (i >= gs.length - 2 ? rm[4 - (gs.length - 1 - i)] : rm[Math.min(i, 2)]) * vTop) }
@@ -9479,7 +9479,7 @@
       const trac = c.mu * s.gm * c.mass * g * c.df;
       if (F > trac) { s.spin = true; F = trac * (1 - .24 * Math.min(1, (F / trac - 1) * 1.6)); s.spinT += dt }
       const R = .5 * 1.2 * c.cda * s.v * s.v + .013 * c.mass * g;
-      let a = (F - R) / (c.mass * 1.06);
+      let a = (F - R) / (c.mass * 1.04);
       if (brake || s.autoBrake) a -= c.brake * (s.autoBrake && !brake ? .85 : 1);
       s.v = Math.max(0, s.v + a * dt);
       s.z += s.v * dt;
@@ -9491,6 +9491,8 @@
       const n = s.gear + d;
       if (n < 1 || n > c.vg.length) return false;
       s.gear = n; s.shift = s.shiftTime || .2; s.shifts++;
+      if (d > 0 && s.rpm > .86) s.popT = s.t;
+      try { if (!s.noFail && d > 0 && sound && !muted && R && (s === R.P || (R.pvp && s === R.A))) { sound.thud(.3 + .3 * Math.min(1, s.rpm)); if (s.c.turbo) sound.blowOff() } } catch (e) { }
       if (d > 0 && s.rpm > .985) s.limShifts++;
       if (d < 0) {
         const over = s.v / c.vg[n - 1];
@@ -9564,7 +9566,7 @@
       let best = { et: 99, rl: .5 };
       const tries = c.ev ? [0] : [.3, .42, .54, .66, .8, .95];
       for (const rl of tries) {
-        const s = arrRun(c, { noFail: true, cond }); s.rpm = rl; s.shiftTime = .25;
+        const s = arrRun(c, { noFail: true, cond }); s.rpm = rl; s.shiftTime = .2;
         arrDepart(s, 0, false); s.launchR = rl;
         const dt = 1 / 120; let t = 0;
         while (s.z < dist && t < 40) {
@@ -10707,7 +10709,7 @@
     // Câmeras da arrancada: altura e horizonte casados com o ângulo das fotos dos carros (tiradas de trás, um pouco de cima)
     const ARR_CAMS = [
       // lente mais fechada e câmera mais atrás: as faixas ficam quase paralelas e o rival anda reto, sem parecer na diagonal
-      { name: 'Traseira', cy: 3.8, yH: .36, back: 4, cx: 1, ox: .6, oxP: .6, f: 1.7, fP: 1.35, backP: 1 },
+      { name: 'Traseira', cy: 3.1, yH: .37, back: 3.4, cx: 1, ox: .6, oxP: .6, f: 1.7, fP: 1.35, backP: 1 },
       { name: 'Alta', cy: 6.4, yH: .28, back: 5, cx: .55, ox: .6, oxP: .58, f: 1 },
       { name: 'TV', cy: 3.6, yH: .37, back: 16, cx: 0, ox: .5, oxP: .5, f: 1.75 },
       { name: 'Cockpit', cockpit: true, cy: 1.18, yH: .4, back: 0, cx: 1, ox: .5, oxP: .5, f: .82 }
@@ -10751,6 +10753,34 @@
       }
       g.restore();
     }
+    // ---------- sensação de velocidade na arrancada ----------
+    function arrVib(F) { // motor vibrando parado e "trepidação" do asfalto em alta
+      if (!F) return 0; const r = F.departed ? 0 : (F.rpm || 0) * .22; return r + Math.min(.32, Math.max(0, F.v - 8) * .007) + (F.spin ? .25 : 0);
+    }
+    function arrPitch(F, CAM) { // agachada na largada (traseira abaixa), cabeceio na troca de marcha e na freada
+      if (!F || CAM.cockpit === undefined && false) return 0;
+      const now = F.t || 0, dt = Math.max(1e-3, now - (F._pt ?? now)); if (dt > 0 && dt < .2) { const a = (F.v - (F._pv ?? F.v)) / dt; F._pa = (F._pa ?? 0) + (Math.max(-12, Math.min(14, a)) - (F._pa ?? 0)) * Math.min(1, dt * 7) }
+      F._pt = now; F._pv = F.v;
+      return Math.max(-.025, Math.min(.03, (F._pa || 0) * (CAM.cockpit ? .0019 : .0016)));
+    }
+    function arrSpeedFx(g, W, H, F, ox, yH, CAM) {
+      const kmh = F.v * 3.6; if (kmh < 45) return;
+      const k = Math.min(1, (kmh - 45) / 110), t = F.t || 0, n = CAM.cockpit ? 18 : 14;
+      g.save(); g.lineCap = 'round';
+      for (let i = 0; i < n; i++) {
+        const seed = i * 12.9898 + Math.floor(t * 18) * 78.233, ra = Math.abs(Math.sin(seed) * 43758.5453) % 1, rb = Math.abs(Math.sin(seed * 1.7) * 23421.631) % 1;
+        const ang = ra * Math.PI * 2, dx = Math.cos(ang), dy = Math.sin(ang) * .7;
+        if (dy < -.05 && Math.abs(dx) < .55) continue; // não risca o céu bem no meio
+        const R0 = Math.hypot(W, H) * (.32 + rb * .25), R1 = R0 + Math.hypot(W, H) * (.06 + .14 * k);
+        g.strokeStyle = 'rgba(240,246,255,' + (.1 + .3 * k) * (1 - rb * .5) + ')'; g.lineWidth = 1.2 + k * 2.6;
+        g.beginPath(); g.moveTo(ox + dx * R0, yH + dy * R0); g.lineTo(ox + dx * R1, yH + dy * R1); g.stroke();
+      }
+      // asfalto borrado perto da câmera (faixa inferior)
+      const bh = H - yH, gr = g.createLinearGradient(0, yH + bh * .55, 0, H);
+      gr.addColorStop(0, 'rgba(30,30,30,0)'); gr.addColorStop(1, 'rgba(30,30,30,' + (.22 * k) + ')');
+      g.fillStyle = gr; g.fillRect(0, yH + bh * .55, W, bh * .45);
+      g.restore();
+    }
     function arrDraw() {
       arrMakeTextures();
       if (!R) { ctx.fillStyle = '#0b1210'; ctx.fillRect(0, 0, w, h); return }
@@ -10774,12 +10804,12 @@
       const g = ctx;
       const P = R.P, A = R.A, L = ARR_CFG.lane;
       const O = F === P ? A : P, fModel = F === P ? R.model : R.rival.m, oModel = O === P ? R.model : R.rival?.m;
-      const sh = R.shake * (Math.random() - .5);
+      const sh = (R.shake + arrVib(F)) * (Math.random() - .5);
       // câmera exatamente atrás do seu carro (alinhada com a faixa), com o centro óptico deslocado
       // para a direita: o carro anda reto na faixa e o rival continua visível na faixa ao lado
       const CAM = ARR_CAMS[arrCamIdx()] || ARR_CAMS[0];
       const camF = W < H && CAM.fP ? CAM.fP : CAM.f, camBack = W < H && CAM.backP != null ? CAM.backP : CAM.back;
-      const f = Math.min(W * 1.02, H * 1.55) * (1 - Math.min(.1, F.v * .002)) * camF, yH = H * CAM.yH;
+      const f = Math.min(W * 1.02, H * 1.55) * (1 - Math.min(.17, F.v * .0034)) * camF, yH = H * (CAM.yH + arrPitch(F, CAM));
       const back = Math.max(7, Math.min(9.5, f / camF / (.135 * W))) * camF + camBack;
       const oxv = W < H ? CAM.oxP : CAM.ox;
       const cz = CAM.cockpit ? F.z - 2.35 : F.z - 3.6 - back - Math.min(2.6, F.v * .06), cx = CAM.cockpit ? side * L - .37 : side * L * CAM.cx, cy = CAM.cy + sh * (CAM.cockpit ? .02 : .05), ox = W * (CAM.cx === 0 || CAM.cockpit ? .5 : side > 0 ? oxv : 1 - oxv);
@@ -10806,6 +10836,8 @@
       if (T.id === 'aero') { for (let z = -50; z < 470; z += 30) for (const s of [-1, 1]) flat(s * 11 - .4, s * 11 + .4, z, z + 18, 'rgba(244,244,238,.85)'); for (const s of [-1, 1]) flat(s * 15 - .25, s * 15, -60, 900, 'rgba(244,244,238,.8)'); for (let i = 0; i < 6; i++) for (const s of [-1, 1]) flat(s * (6.4 + i * 1.4), s * (6.4 + i * 1.4) + s * .9, -40, -10, 'rgba(244,244,238,.9)') }
       for (const lx of [-L, L]) for (const o of [-.75, .75]) { flat(lx + o - .25, lx + o + .25, -6, 40, 'rgba(10,10,10,.55)'); flat(lx + o - .22, lx + o + .22, 40, 110, 'rgba(10,10,10,.32)'); flat(lx + o - .2, lx + o + .2, 110, 200, 'rgba(10,10,10,.16)') }
       for (let zz = 25; zz < 345; zz += 25) flat(-5.4, 5.4, zz, zz + .12, 'rgba(0,0,0,.12)');   // juntas
+      // marcas de borracha e remendos frequentes no asfalto: passam rápido e mostram a velocidade
+      for (let i = 0; i < 150; i++) { const zz = 2 + i * 2.3 + rand(i * 5.3) * 1.6; if (zz < zN - 1 || zz > zF) continue; const xx = -4.6 + rand(i * 3.7) * 9, ww = .25 + rand(i * 8.1) * .9, ll = .4 + rand(i * 1.9) * 1.6; flat(xx, Math.min(4.6, xx + ww), zz, zz + ll, i % 3 ? 'rgba(0,0,0,.10)' : 'rgba(255,255,255,.045)') }
       for (let i = 0; i < 16; i++) { const zz = 30 + i * 19 + rand(i * 4.1) * 8, xx = -4.2 + rand(i * 2.7) * 7.6, ww = .6 + rand(i * 9.1) * 1.4; flat(xx, Math.min(5.3, xx + ww), zz, zz + 1 + rand(i) * 2.5, 'rgba(0,0,0,.07)') }
       flat(-5.4, -4.6, -40, 345, 'rgba(0,0,0,.08)'); flat(4.6, 5.4, -40, 345, 'rgba(0,0,0,.08)');   // sujeira junto ao guard-rail
       flat(-4.45, -4.3, -40, 345, '#efefe6'); flat(4.3, 4.45, -40, 345, '#efefe6'); flat(-.08, .08, -40, 345, '#efefe6');
@@ -10993,7 +11025,10 @@
           }
           // contato dos pneus
           g.fillStyle = 'rgba(0,0,0,.5)'; g.beginPath(); g.ellipse(dx + dw / 2, dy + dh - b[2] * .02, dw * .47, Math.max(1.5, b[2] * .06), 0, 0, 7); g.fill();
-          g.drawImage(src, src.width * bx.l, src.height * bx.t, sw, shh, dx, dy + squat, dw, dh);
+          const jit = s.departed && s.v > 3 ? (Math.random() - .5) * b[2] * .012 * Math.min(1, s.v / 25) : 0;
+          g.drawImage(src, src.width * bx.l, src.height * bx.t, sw, shh, dx, dy + squat + jit, dw, dh);
+          // estouro no escapamento na troca de marcha em giro alto
+          if (s.popT != null && s.t - s.popT < .13 && s.t >= s.popT) { const k = 1 - (s.t - s.popT) / .13, ex = dx + dw * (s.c.m === 17 ? .5 : .3), ey = dy + squat + dh * .86; g.save(); g.globalCompositeOperation = 'screen'; const gr = g.createRadialGradient(ex, ey, 0, ex, ey, dw * .16 * k + 2); gr.addColorStop(0, 'rgba(255,240,180,' + (.95 * k) + ')'); gr.addColorStop(.4, 'rgba(255,140,40,' + (.7 * k) + ')'); gr.addColorStop(1, 'rgba(255,80,0,0)'); g.fillStyle = gr; g.fillRect(ex - dw * .2, ey - dw * .2, dw * .4, dw * .4); g.restore() }
           const pw = dw, ph = dh;
           const braking = (s.brake && s.departed) || s.autoBrake;
           if (braking && !v && s.v > .5) {
@@ -11012,6 +11047,7 @@
       items.sort((a, b) => b[0] - a[0]);
       for (const it of items) { try { it[1]() } catch (e) { window.ARR_DRAW_ERR = (window.ARR_DRAW_ERR || 0) + 1; window.ARR_DRAW_LAST = String(e && e.stack || e).slice(0, 300) } }
       if (CAM.cockpit) arrCockpit(F, fModel, W, H);
+      try { arrSpeedFx(g, W, H, F, ox, yH, CAM) } catch (e) { }
       // vinheta de velocidade
       if (F.v > 18) { const a = Math.min(.35, (F.v - 18) / 80); const gr = g.createRadialGradient(W / 2, H * .5, H * .3, W / 2, H * .5, H * .95); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,' + a + ')'); g.fillStyle = gr; g.fillRect(0, 0, W, H) }
     }
