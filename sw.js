@@ -1,6 +1,6 @@
 // Curvas do Pará: página sempre buscada na rede primeiro (atualizações aparecem na hora);
 // imagens e arquivos guardados no aparelho para abrir rápido e funcionar sem internet.
-const CACHE = 'curvas-v45';
+const CACHE = 'curvas-v46';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())) });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())) });
@@ -15,6 +15,7 @@ self.addEventListener('fetch', e => {
   e.respondWith(caches.open(CACHE).then(async c => {
     const hit = await c.match(req, { ignoreSearch: true });
     if (hit) return hit; // imagens têm nome único (mudam de nome quando mudam)
-    const r = await fetch(req); if (r.ok) c.put(req, r.clone()); return r;
+    let r; try { r = await fetch(req) } catch (e) { await new Promise(t => setTimeout(t, 500)); r = await fetch(req) } // rede do celular oscilou: tenta de novo
+    if (r.ok) c.put(req, r.clone()); return r;
   }));
 });

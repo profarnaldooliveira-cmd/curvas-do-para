@@ -3730,7 +3730,7 @@
       }
     }
     const images = {};
-    function addImage(name, src) { const im = new Image(); im.src = src; images[name] = im }
+    function addImage(name, src) { const im = new Image(); im._src = src; im.addEventListener('error', () => { try { imgRetry(im) } catch (e) { } }); im.src = src; images[name] = im }
     for (const [name, src] of Object.entries(ASSET_MANIFEST)) addImage(name, src);
     const cityBusTextures = {
   "busBelemGreen": "a/a4aa7c4f32a7.webp",
@@ -12975,7 +12975,7 @@
     window.MUSIC = MUS;
 
     // ===================== Carregamento: no site as fotos chegam depois da página (mostra o progresso) =====================
-    function imgProgress() { const all = Object.values(images); if (!all.length) return 1; let ok = 0; for (const i of all) if (i.complete) ok++; return ok / all.length }
+    var imgProgress = function () { const all = Object.values(images); if (!all.length) return 1; let ok = 0; for (const i of all) if (i.complete) ok++; return ok / all.length };
     const LOAD = { done: imgProgress() >= 1, bar: null };
     function loadBarTick() {
       const p = imgProgress(); if (p >= 1) { LOAD.done = true; document.querySelectorAll('.ldBar').forEach(e => e.remove()); return }
@@ -12995,9 +12995,41 @@
       if ($('ldWait')) return;
       const w = document.createElement('div'); w.id = 'ldWait'; w.innerHTML = '<div><b>Quase lá!</b><small>Baixando os carros e as pistas. A corrida começa sozinha.</small></div>';
       document.body.append(w); loadBarTick();
-      const wait = () => { if (imgProgress() >= 1 || !w.isConnected) { w.remove(); LOAD.done = true; LOAD.go = true; try { $('start').click() } finally { LOAD.go = false } } else setTimeout(wait, 200) };
+      const t0 = performance.now(), wait = () => { if (imgProgress() >= 1 || !w.isConnected || performance.now() - t0 > 25000) { w.remove(); LOAD.done = true; LOAD.go = true; try { $('start').click() } finally { LOAD.go = false } } else setTimeout(wait, 200) };
       w.onclick = () => { w.remove() }; wait();
     }, true);
+
+    // ===================== Fotos que falharam ao baixar tentam de novo · etiqueta "Faróis" fora do painel =====================
+    function imgRetry(im) {
+      if (!im || im._dead || !im._src || /^data:/.test(im._src)) return;
+      if ((im._try || 0) >= 6) { im._dead = true; return }
+      im._try = (im._try || 0) + 1;
+      setTimeout(() => { try { im.src = im._src + (im._src.includes('?') ? '&' : '?') + 'r=' + im._try } catch (e) { } }, 350 * im._try * im._try);
+    }
+    // as fotos já criadas: guarda o endereço e reage a erro (inclusive as que já falharam antes deste ponto)
+    for (const im of Object.values(images)) {
+      if (!im || im._src !== undefined) continue;
+      im._src = im.getAttribute('src') || ''; im.addEventListener('error', () => imgRetry(im));
+      if (im.complete && !im.naturalWidth && im._src && !/^data:/.test(im._src)) imgRetry(im);
+    }
+    // conta como pronta só a foto que carregou (ou desistiu depois de várias tentativas)
+    imgProgress = function () { const all = Object.values(images); if (!all.length) return 1; let ok = 0; for (const i of all) if (i.complete && (i.naturalWidth || i._dead || !i._src || /^data:/.test(i._src) && !i.naturalWidth)) ok++; return ok / all.length };
+    // etiqueta de faróis/setas: no celular em pé fica logo abaixo do painel de velocidade
+    setInterval(() => {
+      try {
+        const sg = $('signals'), hud = $('hud'); if (!sg || sg.hidden || !hud || hud.hidden) { if (sg) sg.style.top = ''; return }
+        sg.style.top = ''; sg.style.left = ''; sg.style.transform = '';
+        if (innerWidth < 600 && innerHeight > innerWidth) { // celular em pé: embaixo do painel de velocidade, encostada à esquerda
+          const sp = [...hud.children].filter(e => e !== sg && e.offsetParent).map(e => e.getBoundingClientRect()).sort((p, q) => p.top - q.top)[0];
+          if (sp) { sg.style.top = Math.round(sp.bottom + 8) + 'px'; sg.style.left = '12px'; sg.style.transform = 'none' }
+          return;
+        }
+        const a = sg.getBoundingClientRect();
+        // painéis visíveis do HUD que ficam por baixo da etiqueta (o contêiner do HUD em si é transparente)
+        const boxes = [...hud.querySelectorAll('*')].filter(e => e !== sg && !sg.contains(e) && e.offsetParent && getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)').map(e => e.getBoundingClientRect()).filter(b => a.bottom > b.top && a.top < b.bottom && a.right > b.left && a.left < b.right);
+        if (boxes.length) sg.style.top = Math.round(Math.max(...boxes.map(b => b.bottom)) + 6) + 'px';
+      } catch (e) { }
+    }, 300);
 
     // ===================== Ranking da semana · Desafio do dia online · card na Tela inicial =====================
     function weekTag() { // semana ISO (segunda a domingo)
