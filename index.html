@@ -1321,6 +1321,9 @@
     #tabHome { padding: 9px 10px !important; background: #2a3a32 !important; color: #d6ff60; white-space: nowrap }
     body.hasTabs #menuTabs button { min-width: 0; overflow: hidden; text-overflow: ellipsis }
     @media (max-width: 380px) { body.hasTabs #menuTabs { gap: 3px } body.hasTabs #menuTabs button { font-size: 12px } #tabHome { padding: 9px 8px !important } }
+    #musBox { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; align-items: end }
+    #musBox label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; flex: 1 1 150px }
+    #musBox input[type=range] { width: 100%; accent-color: #d6ff60 }
 
     body.pad button:focus, body.pad select:focus, body.pad input:focus { outline: 3px solid #d6ff60 !important; outline-offset: 2px }
 
@@ -8956,6 +8959,7 @@
         sound.skidFilter.frequency.setTargetAtTime(onDirt ? 420 : 1150, t, .05);
         sound.skidGain.gain.setTargetAtTime(!muted && (skidding ? (onDirt ? .035 : .025) : onDirt && mode === 'race' && v > 3 ? clamp(v / 900, 0, .018) : 0) || 0, t, .06);
         sound.rainGain.gain.setTargetAtTime(mode === 'race' && raining && !muted ? .022 : 0, t, .15);
+        try { soundGuard(t) } catch (e) { }
       }
       requestAnimationFrame(frame);
     }
@@ -12729,6 +12733,124 @@
         const hb = $('tabHome'); if (hb) { const t = innerWidth <= 380 ? '←' : '← Início'; if (hb.textContent !== t) hb.textContent = t }
       } catch (e) { }
     }, 400);
+
+    // ===================== Trilha sonora (sintetizada na hora, estilo jogo de corrida 16 bits) =====================
+    // Músicas originais, geradas pelo próprio navegador: nenhum arquivo é baixado e quase não gasta processamento.
+    const TRACKS = {
+      rodovia: { name: 'Rodovia do Sol', bpm: 150, swing: 0, lead: 'square', leadVol: .045, leadCut: 2600, delay: .18,
+        chords: ['Am', 'F', 'C', 'G', 'Am', 'F', 'G', 'E', 'F', 'G', 'Am', 'Am', 'F', 'G', 'E', 'E'],
+        mel: ['E5 - D5 E5 - C5 A4 -', 'C5 - A4 C5 - D5 E5 -', 'G5 - E5 G5 - E5 D5 C5', 'D5 - - B4 - G4 B4 D5', 'E5 - D5 E5 - A5 G5 E5', 'F5 - E5 D5 - C5 A4 -', 'B4 - D5 G5 - F5 D5 B4', 'G#4 - B4 E5 - - . .',
+          'A5 - G5 F5 - E5 F5 -', 'G5 - F5 E5 - D5 B4 -', 'C5 - E5 A5 - - G5 A5', 'E5 - - - C5 D5 E5 G5', 'A5 - C6 A5 - G5 F5 -', 'D5 - G5 B5 - A5 G5 -', 'G#5 - - E5 - B4 G#4 B4', 'E5 - - - . . E4 G#4'] },
+      neon: { name: 'Belém Neon', bpm: 118, lead: 'sawtooth', leadVol: .032, leadCut: 1700, delay: .32,
+        chords: ['Dm', 'Bb', 'F', 'C', 'Dm', 'Bb', 'F', 'C', 'Gm', 'Bb', 'C', 'A', 'Gm', 'Bb', 'C', 'A'],
+        mel: ['D5 - - F5 - A5 - G5', 'F5 - - D5 - - C5 D5', 'C5 - - A4 - C5 F5 -', 'E5 - - - G5 - E5 C5', 'D5 - F5 A5 - D6 - C6', 'A5 - - F5 - G5 A5 -', 'C6 - A5 - F5 - A5 C6', 'G5 - - - - . . .',
+          'G5 - A5 Bb5 - A5 G5 -', 'F5 - - D5 - F5 G5 -', 'E5 - G5 C6 - Bb5 G5 E5', 'C#5 - E5 A5 - - . .', 'Bb5 - A5 G5 - D5 G5 -', 'F5 - D5 F5 - Bb5 A5 -', 'G5 - E5 C5 - E5 G5 C6', 'A5 - - - E5 - C#5 -'] },
+      racha: { name: 'Racha no Guamá', bpm: 162, lead: 'square', leadVol: .04, leadCut: 3000, delay: .14,
+        chords: ['Em', 'C', 'D', 'B', 'Em', 'C', 'D', 'B', 'Am', 'C', 'Em', 'B', 'Am', 'C', 'D', 'B'],
+        mel: ['E5 E5 - G5 - E5 B5 -', 'A5 - G5 - E5 - G5 -', 'F#5 - A5 - D6 - A5 F#5', 'D#5 - F#5 - B5 - - -', 'E5 - G5 B5 E6 - D6 B5', 'C6 - B5 G5 - E5 G5 -', 'A5 - F#5 D5 - F#5 A5 D6', 'B5 - - A5 F#5 - D#5 -',
+          'C6 - B5 A5 - E5 A5 -', 'G5 - E5 C5 - E5 G5 -', 'B5 - G5 E5 - G5 B5 -', 'A5 - F#5 D#5 - F#5 B5 -', 'E6 - D6 C6 - B5 A5 -', 'G5 - A5 B5 - C6 D6 -', 'F#5 - D5 A5 - F#5 D5 -', 'D#5 - F#5 B5 - - . .'] }
+    };
+    const NOTE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+    function midiOf(n) { const m = /^([A-G])([#b]?)(\d)$/.exec(n); return m ? 12 * (+m[3] + 1) + NOTE[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) : null }
+    function chordOf(c) { const m = /^([A-G])([#b]?)(m?)$/.exec(c); const r = 12 * 3 + NOTE[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0); return { root: r, third: m[3] ? 3 : 4 } }
+    for (const k in TRACKS) { // melodia em colcheias: nota, "-" segura, "." pausa
+      const T = TRACKS[k], ev = [];
+      T.mel.forEach((bar, b) => bar.split(/\s+/).forEach((tok, i) => { const at = b * 8 + i; if (tok === '-') { const last = ev[ev.length - 1]; if (last) last.len++ } else if (tok !== '.') ev.push({ at, m: midiOf(tok), len: 1 }) }));
+      T.lead8 = new Map(ev.map(e => [e.at, e])); T.ch = T.chords.map(chordOf);
+    }
+    const MUS = { on: true, vol: .6, pick: 'auto', cur: null, step: 0, next: 0, bus: null, fx: null, noise: null, level: 0, timer: 0 };
+    try { const s = JSON.parse(localStorage.getItem('pista-studio-musica') || '{}'); if (typeof s.on === 'boolean') MUS.on = s.on; if (s.vol >= 0 && s.vol <= 1) MUS.vol = s.vol; if (TRACKS[s.pick] || s.pick === 'auto') MUS.pick = s.pick } catch (e) { }
+    function musSave() { try { localStorage.setItem('pista-studio-musica', JSON.stringify({ on: MUS.on, vol: MUS.vol, pick: MUS.pick })) } catch (e) { } }
+    function musTrackFor() {
+      if (MUS.pick !== 'auto') return MUS.pick;
+      if (mode === 'drag' || streetMode() || chaseMode()) return 'racha';
+      return night || retro ? 'neon' : 'rodovia';
+    }
+    function musInit() {
+      if (MUS.bus || !sound?.ac) return !!MUS.bus;
+      const ac = sound.ac;
+      MUS.bus = ac.createGain(); MUS.bus.gain.value = 0;
+      // eco curto (um só nó de atraso) para dar o clima de fliperama
+      const dl = ac.createDelay(1), fb = ac.createGain(), wet = ac.createGain(); fb.gain.value = .28; wet.gain.value = .22;
+      dl.connect(fb).connect(dl); dl.connect(wet).connect(MUS.bus);
+      MUS.fx = dl; MUS.bus.connect(ac.destination);
+      const n = ac.createBuffer(1, ac.sampleRate * .5, ac.sampleRate), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; MUS.noise = n;
+      return true;
+    }
+    function musVoice(type, hz, t, dur, vol, cut, toFx) {
+      const ac = sound.ac, o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = hz;
+      g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .008); g.gain.setTargetAtTime(vol * .6, t + .03, .08); g.gain.setTargetAtTime(.0001, t + dur, .03);
+      let node = o; if (cut) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut; o.connect(f); node = f }
+      node.connect(g); g.connect(MUS.bus); if (toFx) g.connect(MUS.fx);
+      o.start(t); o.stop(t + dur + .2);
+    }
+    function musHit(kind, t) {
+      const ac = sound.ac, g = ac.createGain();
+      if (kind === 'kick') { const o = ac.createOscillator(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(42, t + .12); g.gain.setValueAtTime(.16, t); g.gain.exponentialRampToValueAtTime(.0001, t + .16); o.connect(g).connect(MUS.bus); o.start(t); o.stop(t + .17); return }
+      const s = ac.createBufferSource(), f = ac.createBiquadFilter(); s.buffer = MUS.noise;
+      if (kind === 'snare') { f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = .8; g.gain.setValueAtTime(.075, t); g.gain.exponentialRampToValueAtTime(.0001, t + .14) }
+      else { f.type = 'highpass'; f.frequency.value = 7000; g.gain.setValueAtTime(.022, t); g.gain.exponentialRampToValueAtTime(.0001, t + .04) }
+      s.connect(f).connect(g).connect(MUS.bus); s.start(t, Math.random() * .3); s.stop(t + .16);
+    }
+    const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+    function musSchedule() {
+      if (!sound?.ac || !musInit()) return;
+      const ac = sound.ac, now = ac.currentTime;
+      // volume: corrida = cheio · pausa = baixinho · resto = desliga
+      const want = !MUS.on || muted || document.hidden ? 0 : (mode === 'race' || mode === 'drag') ? 1 : mode === 'pause' ? .3 : 0;
+      MUS.bus.gain.setTargetAtTime(want * MUS.vol * (touchDevice ? .75 : .5), now, want ? .35 : .25);
+      MUS.level = want;
+      if (!want) { if (MUS.cur && !(mode === 'pause')) { MUS.cur = null } if (mode !== 'pause') return }
+      const id = musTrackFor();
+      if (MUS.cur !== id) { MUS.cur = id; MUS.step = 0; MUS.next = now + .08 }
+      const T = TRACKS[id], st = 60 / T.bpm / 4; // semicolcheia
+      if (MUS.next < now - .3) MUS.next = now + .05; // aba voltou do segundo plano: recomeça do ponto atual sem "atropelar" notas
+      while (MUS.next < now + .16) {
+        const s = MUS.step % (T.ch.length * 16), bar = s >> 4, inBar = s & 15, t = MUS.next, c = T.ch[bar];
+        // bateria
+        if (inBar === 0 || inBar === 8 || (inBar === 10 && bar % 2)) musHit('kick', t);
+        if (inBar === 4 || inBar === 12) musHit('snare', t);
+        if (inBar % 2 === 0) musHit('hat', t);
+        // baixo pulsando em oitavas (colcheias)
+        if (inBar % 2 === 0) musVoice('triangle', hz(c.root - 12 + (inBar % 4 === 2 ? 12 : 0)), t, st * 1.6, .11, 0);
+        if (inBar % 2 === 0) musVoice('square', hz(c.root - 12 + (inBar % 4 === 2 ? 12 : 0)), t, st * 1.4, .018, 500);
+        // arpejo dos acordes (semicolcheias, bem baixinho)
+        const arp = [0, c.third, 7, 12][inBar % 4];
+        musVoice('square', hz(c.root + 24 + arp), t, st * .7, .012, 2200);
+        // melodia
+        if (inBar % 2 === 0) { const e = T.lead8.get(s >> 1); if (e && e.m) musVoice(T.lead, hz(e.m), t, e.len * st * 2 * .92, T.leadVol, T.leadCut, true) }
+        MUS.step++; MUS.next += st;
+      }
+      if (MUS.fx) MUS.fx.delayTime.setTargetAtTime(T.delay, now, .1);
+    }
+    MUS.timer = setInterval(() => { try { musSchedule() } catch (e) { } }, 50);
+    // ---------- sons que dependiam do desenho da tela (sirenes) não ficam presos na pausa ----------
+    function soundGuard(t) {
+      if (sound.siren && (mode !== 'race' || !cop || cop.over || muted)) sound.siren.g.gain.setTargetAtTime(0, t, .04);
+      if (typeof ambSirenNode !== 'undefined' && ambSirenNode && (mode !== 'race' || muted)) ambSirenNode.g.gain.setTargetAtTime(0, t, .04);
+    }
+    // ---------- controles: Mais opções e tecla B ----------
+    function musUI() {
+      const list = $('xMoreList'); if (!list || $('musBox')) return;
+      const box = document.createElement('div'); box.id = 'musBox';
+      box.innerHTML = '<button type="button" id="musBtn"></button>' +
+        '<label>Faixa<select id="musPick"><option value="auto">Automática (muda com a pista)</option>' + Object.entries(TRACKS).map(([k, T]) => '<option value="' + k + '">' + T.name + '</option>').join('') + '</select></label>' +
+        '<label>Volume da música<input id="musVol" type="range" min="0" max="100" step="5"></label>';
+      list.prepend(box);
+      const paint = () => { $('musBtn').textContent = '🎵 Música: ' + (MUS.on ? 'ligada' : 'desligada') + ' (B)'; $('musPick').value = MUS.pick; $('musVol').value = Math.round(MUS.vol * 100) };
+      paint();
+      $('musBtn').onclick = () => { MUS.on = !MUS.on; musSave(); paint(); try { audio() } catch (e) { } };
+      $('musPick').onchange = e => { MUS.pick = e.target.value; MUS.cur = null; musSave() };
+      $('musVol').oninput = e => { MUS.vol = e.target.value / 100; musSave() };
+      MUS.paint = paint;
+    }
+    for (const t of [200, 900, 2000, 3500]) setTimeout(() => { try { musUI() } catch (e) { } }, t);
+    addEventListener('keydown', e => {
+      if (e.repeat || e.code !== 'KeyB' || /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName || '')) return;
+      MUS.on = !MUS.on; musSave(); try { MUS.paint && MUS.paint() } catch (x) { }
+      try { roadNote = MUS.on ? '🎵 Música ligada' : '🎵 Música desligada'; roadNoteTime = 1.4 } catch (x) { }
+    });
+    window.MUSIC = MUS;
 
     requestAnimationFrame(frame);
 
