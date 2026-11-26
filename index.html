@@ -12298,7 +12298,15 @@
       }
       // chuva: asfalto molhado refletindo o céu e spray levantado pelos carros da frente
       if (raining) {
-        const [, ry, rk] = project(origin + 60, x, 0); if (rk > 0) { const sh = ctx.createLinearGradient(0, hy, 0, ry); sh.addColorStop(0, 'rgba(200,214,226,.16)'); sh.addColorStop(1, 'rgba(200,214,226,0)'); ctx.fillStyle = sh; ctx.fillRect(0, hy, w, Math.max(0, ry - hy)) }
+        const [, ry, rk] = project(origin + 60, x, 0);
+        if (rk > 0 && ry > hy + 2) { // brilho molhado só em cima da pista (segue as curvas), sumindo suave no horizonte
+          const half = route.width * .52, L = [], R = [];
+          for (let d = 6; d <= 520; d *= 1.32) { const s0 = origin + d, a0 = project(s0, -half, 0), b0 = project(s0, half, 0); if (a0[2] <= 0) break; L.push(a0); R.push(b0) }
+          if (L.length > 2) {
+            const sh = ctx.createLinearGradient(0, hy, 0, ry); sh.addColorStop(0, 'rgba(200,214,226,0)'); sh.addColorStop(.18, 'rgba(200,214,226,.16)'); sh.addColorStop(1, 'rgba(200,214,226,0)');
+            ctx.fillStyle = sh; ctx.beginPath(); ctx.moveTo(L[0][0], L[0][1]); for (const p of L) ctx.lineTo(p[0], p[1]); for (let i = R.length - 1; i >= 0; i--) ctx.lineTo(R[i][0], R[i][1]); ctx.closePath(); ctx.fill();
+          }
+        }
         ctx.globalCompositeOperation = 'source-over';
         for (const car of traffic) {
           if (car.direction < 0) continue; const back = car.s - car.type.half, d = back - origin;
