@@ -13334,7 +13334,7 @@
     requestAnimationFrame(frame);
 
   </script>
-  <script>if ('serviceWorker' in navigator && location.protocol === 'https:') addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => { }));</script>
+  <script>if ('serviceWorker' in navigator && location.protocol === 'https:') { addEventListener('load', () => navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => { })); let had = !!navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange', () => { if (!had) { had = true; return } try { if (sessionStorage.getItem('sw-reloaded')) return; sessionStorage.setItem('sw-reloaded', '1') } catch (e) { } if (typeof mode === 'undefined' || mode === 'menu') location.reload(); else try { toastAcc('🔄 Nova versão do jogo pronta: recarregue a página depois da corrida') } catch (e) { } }) }</script>
 </body>
 
 </html>
