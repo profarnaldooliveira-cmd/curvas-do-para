@@ -12616,10 +12616,17 @@
 
     // ===================== Experiência do jogador: missões com atalho, menu enxuto, primeira corrida =====================
     // ---------- missão: "Ir agora" já prepara tudo e larga ----------
+    // sai do resultado / pausa para a garagem antes de preparar outra corrida
+    function uxToMenu() {
+      try { if (mode === 'finish' || mode === 'pause') backToGarage() } catch (e) { }
+      try { if (arrHubOpen) { closeArrancada() } } catch (e) { }
+      return mode === 'menu';
+    }
     function msSetMode(v) { const gm = $('gameMode'); if (gm.value !== v) { gm.value = v; gm.dispatchEvent(new Event('change')) } }
     function msSafeCar() { const c = $('car'); if (!carOwned(c.selectedIndex)) { c.selectedIndex = 0; c.dispatchEvent(new Event('change')) } }
     function msGo(i) {
-      const o = msEnsure().list[i]; if (!o || o.done || mode !== 'menu') return;
+      const o = msEnsure().list[i]; if (!o || o.done) return;
+      if (!uxToMenu()) return;
       document.querySelectorAll('#missionsModal,.xModal').forEach(e => e.remove());
       try { $('quickStart')?.remove() } catch (e) { }
       if (o.t === 'drag_win' || o.t === 'drag_runs') { openArrancada(); return }
@@ -12974,7 +12981,7 @@
       const kSel = el.querySelector('[data-k="kind"]'); kSel.value = (key.match(/k\d+$/) || [''])[0];
       const load = async () => {
         el.querySelectorAll('[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === period));
-        el.querySelector('.rkPick').hidden = period === 'day'; el.querySelector('.rkDay').hidden = period !== 'day'; el.querySelector('[data-k="play"]').hidden = period !== 'day' || mode !== 'menu';
+        el.querySelector('.rkPick').hidden = period === 'day'; el.querySelector('.rkDay').hidden = period !== 'day'; el.querySelector('[data-k="play"]').hidden = period !== 'day' || !['menu', 'finish', 'pause'].includes(mode);
         const base = el.querySelector('[data-k="route"]').value + kSel.value;
         const k = period === 'day' ? dayTag() : period === 'week' ? weekTag() + '_' + base : base, list = el.querySelector('.rankList');
         list.innerHTML = '<li>Carregando…</li>';
@@ -12992,6 +12999,7 @@
     };
     function dailyGo() {
       document.querySelectorAll('.xModal').forEach(e => e.remove()); try { $('quickStart')?.remove() } catch (e) { }
+      if (!uxToMenu()) return;
       const gm = $('gameMode'); gm.value = 'daily'; gm.dispatchEvent(new Event('change'));
       setTimeout(() => { try { $('start').click() } catch (e) { } }, 60);
     }
